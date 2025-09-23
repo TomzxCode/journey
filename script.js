@@ -1,6 +1,7 @@
 class DailyJournal {
     constructor() {
         this.entries = this.loadEntries();
+        this.directoryEntries = this.loadDirectoryEntries();
         this.currentFilter = 'yesterday';
         this.currentCalendarYear = new Date().getFullYear();
         this.similarEntriesTimeout = null;
@@ -60,6 +61,15 @@ class DailyJournal {
 
     saveEntries() {
         localStorage.setItem('journalEntries', JSON.stringify(this.entries));
+    }
+
+    loadDirectoryEntries() {
+        const stored = localStorage.getItem('directoryEntries');
+        return stored ? JSON.parse(stored) : {};
+    }
+
+    saveDirectoryEntries() {
+        localStorage.setItem('directoryEntries', JSON.stringify(this.directoryEntries));
     }
 
     loadTodaysEntry() {
@@ -807,12 +817,14 @@ class DailyJournal {
                     const fileInfo = this.foundFiles[index];
                     const content = await fileInfo.file.text();
                     const fileName = fileInfo.file.name;
-                    const dateString = this.extractDateFromContent(content, fileName);
+                    const fileKey = fileInfo.relativePath; // Use file path as unique key for directory files
 
-                    if (dateString) {
-                        this.entries[dateString] = content;
-                        loadedCount++;
+                    // Store directory-loaded files separately with file path as key
+                    if (!this.directoryEntries) {
+                        this.directoryEntries = {};
                     }
+                    this.directoryEntries[fileKey] = content;
+                    loadedCount++;
                 } catch (error) {
                     console.warn(`Failed to load file ${this.foundFiles[index].file.name}:`, error);
                 }
@@ -823,7 +835,7 @@ class DailyJournal {
                 const selectedFilePaths = selectedIndexes.map(index => this.foundFiles[index].relativePath);
                 this.saveSelectedFilePaths(selectedFilePaths);
 
-                this.saveEntries();
+                this.saveDirectoryEntries();
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
@@ -994,20 +1006,21 @@ class DailyJournal {
             for (const fileInfo of existingFiles) {
                 try {
                     const content = await fileInfo.file.text();
-                    const fileName = fileInfo.file.name;
-                    const dateString = this.extractDateFromContent(content, fileName);
+                    const fileKey = fileInfo.relativePath; // Use file path as unique key
 
-                    if (dateString) {
-                        this.entries[dateString] = content;
-                        loadedCount++;
+                    // Store directory-loaded files separately with file path as key
+                    if (!this.directoryEntries) {
+                        this.directoryEntries = {};
                     }
+                    this.directoryEntries[fileKey] = content;
+                    loadedCount++;
                 } catch (error) {
                     console.warn(`Failed to load file ${fileInfo.file.name}:`, error);
                 }
             }
 
             if (loadedCount > 0) {
-                this.saveEntries();
+                this.saveDirectoryEntries();
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
