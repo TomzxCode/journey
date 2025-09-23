@@ -3,6 +3,7 @@ class DailyJournal {
         this.entries = this.loadEntries();
         this.currentFilter = 'yesterday';
         this.currentCalendarYear = new Date().getFullYear();
+        this.similarEntriesTimeout = null;
         this.init();
     }
 
@@ -95,11 +96,18 @@ class DailyJournal {
 
     onEntryInput(e) {
         const text = e.target.value;
-        this.findSimilarEntries(text);
+
+        if (this.similarEntriesTimeout) {
+            clearTimeout(this.similarEntriesTimeout);
+        }
+
+        this.similarEntriesTimeout = setTimeout(() => {
+            this.findSimilarEntries(text);
+        }, 150);
     }
 
     findSimilarEntries(currentText) {
-        if (currentText.length < 10) {
+        if (currentText.length < 3) {
             document.getElementById('similarEntriesContainer').innerHTML = '';
             return;
         }
@@ -107,25 +115,37 @@ class DailyJournal {
         const words = this.extractKeywords(currentText);
         const similarEntries = [];
         const today = this.getDateString();
+        const searchText = currentText.toLowerCase().trim();
 
         Object.keys(this.entries).forEach(date => {
             if (date === today) return;
 
             const entryText = this.entries[date];
             const entryWords = this.extractKeywords(entryText);
-            const similarity = this.calculateSimilarity(words, entryWords);
 
-            if (similarity > 0.2) {
+            // Check for exact substring matches (for names, specific phrases)
+            const containsMatch = entryText.toLowerCase().includes(searchText);
+
+            // Calculate keyword-based similarity
+            const keywordSimilarity = this.calculateSimilarity(words, entryWords);
+
+            // Combine both approaches: exact matches get higher priority
+            let finalScore = keywordSimilarity;
+            if (containsMatch) {
+                finalScore = Math.max(0.8, keywordSimilarity); // Boost exact matches
+            }
+
+            if (finalScore > 0.1 || containsMatch) {
                 similarEntries.push({
                     date,
                     content: entryText,
-                    similarity
+                    similarity: finalScore
                 });
             }
         });
 
         similarEntries.sort((a, b) => b.similarity - a.similarity);
-        this.displaySimilarEntries(similarEntries.slice(0, 3));
+        this.displaySimilarEntries(similarEntries.slice(0, 5));
     }
 
     extractKeywords(text) {
@@ -134,7 +154,7 @@ class DailyJournal {
         return text.toLowerCase()
             .replace(/[^\w\s]/g, ' ')
             .split(/\s+/)
-            .filter(word => word.length > 2 && !stopWords.has(word));
+            .filter(word => word.length > 1 && !stopWords.has(word));
     }
 
     calculateSimilarity(words1, words2) {
