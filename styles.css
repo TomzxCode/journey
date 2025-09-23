@@ -173,6 +173,206 @@ button {
     background-color: #138496;
 }
 
+.directory-selection {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.directory-selection h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.directory-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+#selectDirectoryBtn {
+    background-color: #28a745;
+    color: white;
+}
+
+#selectDirectoryBtn:hover {
+    background-color: #218838;
+}
+
+#loadDirectoryBtn {
+    background-color: #007bff;
+    color: white;
+}
+
+#loadDirectoryBtn:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
+#clearDirectoryBtn {
+    background-color: #dc3545;
+    color: white;
+}
+
+#clearDirectoryBtn:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+.directory-info {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+}
+
+.directory-info p {
+    margin-bottom: 15px;
+    color: #495057;
+}
+
+.file-filters {
+    margin-bottom: 15px;
+}
+
+.file-filters label {
+    display: block;
+    margin-bottom: 8px;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.file-filters input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.auto-scan-toggle label {
+    color: #495057;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.file-list-container {
+    margin-top: 20px;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    padding: 15px;
+}
+
+.file-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.file-list-header h4 {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.file-selection-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.control-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s;
+}
+
+.control-btn:hover {
+    background-color: #5a6268;
+}
+
+.file-count {
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.file-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    background-color: white;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f3f4;
+    transition: background-color 0.2s;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-item:hover {
+    background-color: #f8f9fa;
+}
+
+.file-item input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.file-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.file-path {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-family: monospace;
+}
+
+.file-size {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-left: 10px;
+}
+
+#scanDirectoryBtn {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+#scanDirectoryBtn:hover:not(:disabled) {
+    background-color: #e0a800;
+}
+
+#loadSelectedBtn {
+    background-color: #007bff;
+    color: white;
+}
+
+#loadSelectedBtn:hover:not(:disabled) {
+    background-color: #0056b3;
+}
+
 .no-entries {
     text-align: center;
     color: #6c757d;

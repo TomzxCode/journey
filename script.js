@@ -13,6 +13,7 @@ class DailyJournal {
         this.generateActivityCalendar();
         this.displayPastEntries();
         this.loadTodaysEntry();
+        this.loadDirectorySettings();
     }
 
     updateCurrentDate() {
@@ -38,6 +39,13 @@ class DailyJournal {
         document.getElementById('importBtn').addEventListener('click', () => this.importJournal());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportJournal());
         document.getElementById('importFile').addEventListener('change', (e) => this.handleFileImport(e));
+
+        document.getElementById('selectDirectoryBtn').addEventListener('click', () => this.selectDirectory());
+        document.getElementById('scanDirectoryBtn').addEventListener('click', () => this.scanDirectoryFiles());
+        document.getElementById('loadSelectedBtn').addEventListener('click', () => this.loadSelectedFiles());
+        document.getElementById('clearDirectoryBtn').addEventListener('click', () => this.clearDirectory());
+        document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
+        document.getElementById('selectNoneFilesBtn').addEventListener('click', () => this.selectNoneFiles());
     }
 
     getDateString(date = new Date()) {
@@ -576,6 +584,370 @@ class DailyJournal {
             message.style.opacity = '0';
             setTimeout(() => message.remove(), 300);
         }, 3000);
+    }
+
+    async selectDirectory() {
+        try {
+            if (!('showDirectoryPicker' in window)) {
+                this.showMessage('Directory picker not supported in this browser. Use Chrome/Edge 86+', 'error');
+                return;
+            }
+
+            const directoryHandle = await window.showDirectoryPicker();
+            this.selectedDirectory = directoryHandle;
+
+            const directoryInfo = document.getElementById('directoryInfo');
+            const directoryPath = document.getElementById('selectedDirectoryPath');
+            const scanBtn = document.getElementById('scanDirectoryBtn');
+            const clearBtn = document.getElementById('clearDirectoryBtn');
+
+            directoryPath.textContent = directoryHandle.name;
+            directoryInfo.style.display = 'block';
+            scanBtn.disabled = false;
+            clearBtn.disabled = false;
+
+            this.saveDirectorySettings();
+
+            // Check if we should auto-load previously selected files
+            const savedFilePaths = this.getSavedSelectedFilePaths();
+            const shouldAutoLoad = savedFilePaths && savedFilePaths.length > 0;
+
+            if (document.getElementById('autoScanFiles').checked || shouldAutoLoad) {
+                await this.scanDirectoryFiles();
+
+                if (shouldAutoLoad) {
+                    await this.autoLoadPreviouslySelectedFiles(savedFilePaths);
+                }
+            }
+
+            this.showMessage('Directory selected successfully!', 'success');
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                this.showMessage('Failed to select directory', 'error');
+            }
+        }
+    }
+
+    async scanDirectoryFiles() {
+        if (!this.selectedDirectory) {
+            this.showMessage('Please select a directory first', 'error');
+            return;
+        }
+
+        try {
+            const fileExtensions = this.getSelectedFileExtensions();
+            const fileData = await this.getFilesFromDirectory(this.selectedDirectory, fileExtensions);
+
+            this.foundFiles = fileData;
+            this.displayFileList(fileData);
+
+            const fileListContainer = document.getElementById('fileListContainer');
+            const loadBtn = document.getElementById('loadSelectedBtn');
+
+            fileListContainer.style.display = 'block';
+            loadBtn.disabled = false;
+
+            this.showMessage(`Found ${fileData.length} files. Select which files to load.`, 'success');
+
+        } catch (error) {
+            this.showMessage('Failed to scan directory for files', 'error');
+        }
+    }
+
+    displayFileList(fileData, previouslySelectedPaths = null) {
+        const fileList = document.getElementById('fileList');
+        const fileCount = document.getElementById('fileCount');
+
+        fileCount.textContent = `${fileData.length} files found`;
+        fileList.innerHTML = '';
+
+        fileData.forEach((fileInfo, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `file-${index}`;
+
+            // Check if this file was previously selected, or default to true if no previous selection
+            if (previouslySelectedPaths) {
+                checkbox.checked = previouslySelectedPaths.includes(fileInfo.relativePath);
+            } else {
+                checkbox.checked = true;
+            }
+
+            checkbox.addEventListener('change', () => this.updateLoadButtonState());
+
+            const fileInfoDiv = document.createElement('div');
+            fileInfoDiv.className = 'file-info';
+
+            const fileDetails = document.createElement('div');
+            const fileName = document.createElement('div');
+            fileName.className = 'file-name';
+            fileName.textContent = fileInfo.file.name;
+
+            const filePath = document.createElement('div');
+            filePath.className = 'file-path';
+            filePath.textContent = fileInfo.relativePath;
+
+            fileDetails.appendChild(fileName);
+            fileDetails.appendChild(filePath);
+
+            const fileSize = document.createElement('div');
+            fileSize.className = 'file-size';
+            fileSize.textContent = this.formatFileSize(fileInfo.file.size);
+
+            fileInfoDiv.appendChild(fileDetails);
+            fileInfoDiv.appendChild(fileSize);
+
+            fileItem.appendChild(checkbox);
+            fileItem.appendChild(fileInfoDiv);
+
+            fileList.appendChild(fileItem);
+        });
+    }
+
+    async loadSelectedFiles() {
+        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]:checked');
+        const selectedIndexes = Array.from(checkboxes).map(cb => parseInt(cb.id.replace('file-', '')));
+
+        if (selectedIndexes.length === 0) {
+            this.showMessage('Please select at least one file to load', 'error');
+            return;
+        }
+
+        try {
+            let loadedCount = 0;
+
+            for (const index of selectedIndexes) {
+                try {
+                    const fileInfo = this.foundFiles[index];
+                    const content = await fileInfo.file.text();
+                    const fileName = fileInfo.file.name;
+                    const dateString = this.extractDateFromContent(content, fileName);
+
+                    if (dateString) {
+                        this.entries[dateString] = content;
+                        loadedCount++;
+                    }
+                } catch (error) {
+                    console.warn(`Failed to load file ${this.foundFiles[index].file.name}:`, error);
+                }
+            }
+
+            if (loadedCount > 0) {
+                // Save the selected file paths for future auto-loading
+                const selectedFilePaths = selectedIndexes.map(index => this.foundFiles[index].relativePath);
+                this.saveSelectedFilePaths(selectedFilePaths);
+
+                this.saveEntries();
+                this.generateYearTabs();
+                this.generateActivityCalendar();
+                this.displayPastEntries();
+                this.loadTodaysEntry();
+                this.showMessage(`Successfully loaded ${loadedCount} of ${selectedIndexes.length} selected files`, 'success');
+            } else {
+                this.showMessage('No valid content found in selected files', 'error');
+            }
+
+        } catch (error) {
+            this.showMessage('Failed to load selected files', 'error');
+        }
+    }
+
+    async getFilesFromDirectory(directoryHandle, extensions, relativePath = '') {
+        const files = [];
+
+        for await (const entry of directoryHandle.values()) {
+            if (entry.kind === 'file') {
+                const extension = entry.name.split('.').pop().toLowerCase();
+                if (extensions.includes(extension)) {
+                    const file = await entry.getFile();
+                    const fileRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+                    files.push({
+                        file: file,
+                        relativePath: fileRelativePath,
+                        handle: entry
+                    });
+                }
+            } else if (entry.kind === 'directory') {
+                const subdirRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+                const subdirFiles = await this.getFilesFromDirectory(entry, extensions, subdirRelativePath);
+                files.push(...subdirFiles);
+            }
+        }
+
+        return files;
+    }
+
+    getSelectedFileExtensions() {
+        const extensions = [];
+        if (document.getElementById('filterMarkdown').checked) extensions.push('md');
+        if (document.getElementById('filterText').checked) extensions.push('txt');
+        if (document.getElementById('filterJson').checked) extensions.push('json');
+        return extensions;
+    }
+
+    extractDateFromContent(content, fileName) {
+        const dateRegex = /(\d{4}-\d{2}-\d{2})/;
+
+        let match = content.match(dateRegex);
+        if (match) return match[1];
+
+        match = fileName.match(dateRegex);
+        if (match) return match[1];
+
+        const today = this.getDateString();
+        return today;
+    }
+
+    clearDirectory() {
+        this.selectedDirectory = null;
+
+        const directoryInfo = document.getElementById('directoryInfo');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const scanBtn = document.getElementById('scanDirectoryBtn');
+        const loadBtn = document.getElementById('loadSelectedBtn');
+        const clearBtn = document.getElementById('clearDirectoryBtn');
+
+        directoryInfo.style.display = 'none';
+        fileListContainer.style.display = 'none';
+        scanBtn.disabled = true;
+        loadBtn.disabled = true;
+        clearBtn.disabled = true;
+
+        this.clearDirectorySettings();
+        this.clearSelectedFilePaths();
+        this.showMessage('Directory selection cleared', 'success');
+    }
+
+    saveDirectorySettings() {
+        const settings = {
+            directoryName: this.selectedDirectory?.name,
+            autoScan: document.getElementById('autoScanFiles').checked,
+            fileFilters: {
+                markdown: document.getElementById('filterMarkdown').checked,
+                text: document.getElementById('filterText').checked,
+                json: document.getElementById('filterJson').checked
+            }
+        };
+        localStorage.setItem('directorySettings', JSON.stringify(settings));
+    }
+
+    loadDirectorySettings() {
+        const stored = localStorage.getItem('directorySettings');
+        if (stored) {
+            const settings = JSON.parse(stored);
+            document.getElementById('autoScanFiles').checked = settings.autoScan || false;
+            document.getElementById('filterMarkdown').checked = settings.fileFilters?.markdown !== false;
+            document.getElementById('filterText').checked = settings.fileFilters?.text !== false;
+            document.getElementById('filterJson').checked = settings.fileFilters?.json || false;
+        }
+    }
+
+    clearDirectorySettings() {
+        localStorage.removeItem('directorySettings');
+    }
+
+    selectAllFiles() {
+        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
+        checkboxes.forEach(checkbox => checkbox.checked = true);
+        this.updateLoadButtonState();
+    }
+
+    selectNoneFiles() {
+        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
+        checkboxes.forEach(checkbox => checkbox.checked = false);
+        this.updateLoadButtonState();
+    }
+
+    updateLoadButtonState() {
+        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]:checked');
+        const loadBtn = document.getElementById('loadSelectedBtn');
+        loadBtn.disabled = checkboxes.length === 0;
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    saveSelectedFilePaths(filePaths) {
+        if (this.selectedDirectory) {
+            const key = `selectedFiles_${this.selectedDirectory.name}`;
+            localStorage.setItem(key, JSON.stringify(filePaths));
+        }
+    }
+
+    getSavedSelectedFilePaths() {
+        if (this.selectedDirectory) {
+            const key = `selectedFiles_${this.selectedDirectory.name}`;
+            const saved = localStorage.getItem(key);
+            return saved ? JSON.parse(saved) : null;
+        }
+        return null;
+    }
+
+    async autoLoadPreviouslySelectedFiles(savedFilePaths) {
+        try {
+            // Find which files from the saved paths still exist
+            const existingFiles = this.foundFiles.filter(fileInfo =>
+                savedFilePaths.includes(fileInfo.relativePath)
+            );
+
+            if (existingFiles.length === 0) {
+                this.showMessage('None of the previously selected files were found', 'error');
+                return;
+            }
+
+            // Update the file list display to show previous selections
+            this.displayFileList(this.foundFiles, savedFilePaths);
+
+            // Auto-load the existing files
+            let loadedCount = 0;
+            for (const fileInfo of existingFiles) {
+                try {
+                    const content = await fileInfo.file.text();
+                    const fileName = fileInfo.file.name;
+                    const dateString = this.extractDateFromContent(content, fileName);
+
+                    if (dateString) {
+                        this.entries[dateString] = content;
+                        loadedCount++;
+                    }
+                } catch (error) {
+                    console.warn(`Failed to load file ${fileInfo.file.name}:`, error);
+                }
+            }
+
+            if (loadedCount > 0) {
+                this.saveEntries();
+                this.generateYearTabs();
+                this.generateActivityCalendar();
+                this.displayPastEntries();
+                this.loadTodaysEntry();
+
+                const missingCount = savedFilePaths.length - existingFiles.length;
+                let message = `Auto-loaded ${loadedCount} previously selected files`;
+                if (missingCount > 0) {
+                    message += ` (${missingCount} files no longer found)`;
+                }
+                this.showMessage(message, 'success');
+            }
+
+        } catch (error) {
+            this.showMessage('Failed to auto-load previously selected files', 'error');
+        }
+    }
+
+    clearSelectedFilePaths() {
+        if (this.selectedDirectory) {
+            const key = `selectedFiles_${this.selectedDirectory.name}`;
+            localStorage.removeItem(key);
+        }
     }
 }
 

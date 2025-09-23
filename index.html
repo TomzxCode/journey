@@ -66,6 +66,46 @@
                     <button id="importBtn">Import Journal</button>
                     <button id="exportBtn">Export as Markdown</button>
                 </div>
+
+                <div class="directory-selection">
+                    <h3>Directory Auto-Load</h3>
+                    <div class="directory-actions">
+                        <button id="selectDirectoryBtn">Select Directory</button>
+                        <button id="scanDirectoryBtn" disabled>Scan for Files</button>
+                        <button id="loadSelectedBtn" disabled>Load Selected Files</button>
+                        <button id="clearDirectoryBtn" disabled>Clear Selection</button>
+                    </div>
+                    <div class="directory-info" id="directoryInfo" style="display: none;">
+                        <p><strong>Selected Directory:</strong> <span id="selectedDirectoryPath"></span></p>
+                        <div class="file-filters">
+                            <label>
+                                <input type="checkbox" id="filterMarkdown" checked> Markdown (.md)
+                            </label>
+                            <label>
+                                <input type="checkbox" id="filterText" checked> Text (.txt)
+                            </label>
+                            <label>
+                                <input type="checkbox" id="filterJson"> JSON (.json)
+                            </label>
+                        </div>
+                        <div class="auto-scan-toggle">
+                            <label>
+                                <input type="checkbox" id="autoScanFiles"> Auto-scan on directory selection
+                            </label>
+                        </div>
+                    </div>
+                    <div class="file-list-container" id="fileListContainer" style="display: none;">
+                        <div class="file-list-header">
+                            <h4>Found Files</h4>
+                            <div class="file-selection-controls">
+                                <button id="selectAllFilesBtn" class="control-btn">Select All</button>
+                                <button id="selectNoneFilesBtn" class="control-btn">Select None</button>
+                                <span class="file-count" id="fileCount">0 files found</span>
+                            </div>
+                        </div>
+                        <div class="file-list" id="fileList"></div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
