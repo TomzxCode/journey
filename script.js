@@ -337,7 +337,7 @@ class DailyJournal {
             if (hasEntry) {
                 dayElement.addEventListener('mouseenter', (e) => this.showTooltip(e, dateString));
                 dayElement.addEventListener('mouseleave', () => this.hideTooltip());
-                dayElement.addEventListener('click', () => this.scrollToEntry(dateString));
+                dayElement.addEventListener('click', () => this.showEntryModal(dateString));
             }
 
             calendarGrid.appendChild(dayElement);
@@ -412,6 +412,69 @@ class DailyJournal {
         if (this.currentTooltip) {
             this.currentTooltip.remove();
             this.currentTooltip = null;
+        }
+    }
+
+    showEntryModal(dateString) {
+        const entry = this.entries[dateString];
+        if (!entry) return;
+
+        const date = new Date(dateString);
+        const formattedDate = date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+        });
+
+        // Create modal elements
+        const modal = document.createElement('div');
+        modal.className = 'entry-modal';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+
+        modalContent.innerHTML = `
+            <div class="modal-header">
+                <h3>${formattedDate}</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="entry-content">${entry.replace(/\n/g, '<br>')}</div>
+            </div>
+        `;
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+
+        // Add event listeners
+        const closeBtn = modal.querySelector('.close-modal');
+        closeBtn.addEventListener('click', () => this.closeEntryModal());
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeEntryModal();
+            }
+        });
+
+        document.addEventListener('keydown', this.handleModalKeydown.bind(this));
+
+        // Show modal with animation
+        setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    closeEntryModal() {
+        const modal = document.querySelector('.entry-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 300);
+        }
+        document.removeEventListener('keydown', this.handleModalKeydown);
+    }
+
+    handleModalKeydown(e) {
+        if (e.key === 'Escape') {
+            this.closeEntryModal();
         }
     }
 
