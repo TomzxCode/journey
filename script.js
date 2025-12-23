@@ -83,7 +83,7 @@ class DailyJournal {
         document.getElementById('importFile').addEventListener('change', (e) => this.handleFileImport(e));
 
         document.getElementById('selectDirectoryBtn').addEventListener('click', () => this.selectDirectory());
-        document.getElementById('loadSelectedBtn').addEventListener('click', () => this.loadSelectedFiles());
+        document.getElementById('updateFilesBtn').addEventListener('click', () => this.updateSelectedFiles());
         document.getElementById('clearDirectoryBtn').addEventListener('click', () => this.clearDirectory());
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
         document.getElementById('selectNoneFilesBtn').addEventListener('click', () => this.selectNoneFiles());
@@ -187,6 +187,7 @@ class DailyJournal {
 
         this.renderFileTabs();
         this.refreshView();
+        this.updateLoadButtonState();
         this.showMessage(`Closed ${fileToRemove.name}`, 'info');
     }
 
@@ -850,10 +851,9 @@ class DailyJournal {
             this.displayFileList(fileData);
 
             const fileListContainer = document.getElementById('fileListContainer');
-            const loadBtn = document.getElementById('loadSelectedBtn');
-
+            
             fileListContainer.style.display = 'block';
-            loadBtn.disabled = false;
+            this.updateLoadButtonState();
 
             this.showMessage(`Found ${fileData.length} files. Select which files to load.`, 'success');
 
@@ -917,18 +917,47 @@ class DailyJournal {
         });
     }
 
-    async loadSelectedFiles() {
-        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]:checked');
-        const selectedIndexes = Array.from(checkboxes).map(cb => parseInt(cb.id.replace('file-', '')));
+    async updateSelectedFiles() {
+        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
+        const selectedIndexes = [];
+        const unselectedIndexes = [];
 
-        if (selectedIndexes.length === 0) {
-            this.showMessage('Please select at least one file to load', 'error');
-            return;
-        }
+        checkboxes.forEach(cb => {
+            const index = parseInt(cb.id.replace('file-', ''));
+            if (cb.checked) {
+                selectedIndexes.push(index);
+            } else {
+                unselectedIndexes.push(index);
+            }
+        });
 
         try {
             let loadedCount = 0;
+            let removedCount = 0;
 
+            // 1. Remove files that are unchecked but currently open
+            const unselectedPaths = unselectedIndexes.map(index => this.foundFiles[index].relativePath);
+            
+            // Iterate backwards through this.files to safely remove
+            for (let i = this.files.length - 1; i >= 0; i--) {
+                const file = this.files[i];
+                if (file.type === 'file' && unselectedPaths.includes(file.path)) {
+                    // Remove from directoryEntries
+                    delete this.directoryEntries[file.path];
+                    
+                    // Remove from files array
+                    this.files.splice(i, 1);
+                    
+                    removedCount++;
+                }
+            }
+
+            // Adjust activeFileIndex if it's out of bounds
+            if (this.activeFileIndex >= this.files.length) {
+                this.activeFileIndex = Math.max(0, this.files.length - 1);
+            }
+
+            // 2. Load/Update selected files
             for (const index of selectedIndexes) {
                 try {
                     const fileInfo = this.foundFiles[index];
@@ -966,28 +995,22 @@ class DailyJournal {
                 }
             }
 
-            if (loadedCount > 0) {
-                // Save the selected file paths for future auto-loading
-                const selectedFilePaths = selectedIndexes.map(index => this.foundFiles[index].relativePath);
-                this.saveSelectedFilePaths(selectedFilePaths);
+            // Save the selected file paths for future auto-loading
+            const selectedFilePaths = selectedIndexes.map(index => this.foundFiles[index].relativePath);
+            this.saveSelectedFilePaths(selectedFilePaths);
 
-                this.saveDirectoryEntries();
+            this.saveDirectoryEntries();
 
-                // Refresh UI
-                this.renderFileTabs();
-                // Switch to the first newly loaded file (last one added?)
-                // Or stay on current? 
-                // Let's switch to the last added file if it was a new addition
-                this.switchFileTab(this.files.length - 1);
-                
-                this.showMessage(`Successfully loaded ${loadedCount} selected files`, 'success');
-            } else {
-                this.showMessage('No valid content found in selected files', 'error');
-            }
+            // Refresh UI
+            this.renderFileTabs();
+            this.refreshView();
+            this.updateLoadButtonState();
+            
+            this.showMessage(`List updated: ${loadedCount} loaded, ${removedCount} removed`, 'success');
 
         } catch (error) {
             console.error(error);
-            this.showMessage('Failed to load selected files', 'error');
+            this.showMessage('Failed to update file list', 'error');
         }
     }
 
@@ -1029,12 +1052,12 @@ class DailyJournal {
 
         const directoryInfo = document.getElementById('directoryInfo');
         const fileListContainer = document.getElementById('fileListContainer');
-        const loadBtn = document.getElementById('loadSelectedBtn');
+        const updateBtn = document.getElementById('updateFilesBtn');
         const clearBtn = document.getElementById('clearDirectoryBtn');
 
         directoryInfo.style.display = 'none';
         fileListContainer.style.display = 'none';
-        loadBtn.disabled = true;
+        updateBtn.disabled = true;
         clearBtn.disabled = true;
 
         this.clearDirectorySettings();
@@ -1118,9 +1141,30 @@ class DailyJournal {
     }
 
     updateLoadButtonState() {
-        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]:checked');
-        const loadBtn = document.getElementById('loadSelectedBtn');
-        loadBtn.disabled = checkboxes.length === 0;
+        const updateBtn = document.getElementById('updateFilesBtn');
+        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
+        
+        // Create a Set of open file paths for fast lookup
+        const openPaths = new Set(this.files.filter(f => f.type === 'file').map(f => f.path));
+        
+        let hasChanges = false;
+        
+        for (const cb of checkboxes) {
+            const index = parseInt(cb.id.replace('file-', ''));
+            const fileInfo = this.foundFiles[index];
+            if (!fileInfo) continue;
+            
+            const path = fileInfo.relativePath;
+            const isChecked = cb.checked;
+            const isOpen = openPaths.has(path);
+            
+            if (isChecked !== isOpen) {
+                hasChanges = true;
+                break;
+            }
+        }
+        
+        updateBtn.disabled = !hasChanges;
     }
 
     formatFileSize(bytes) {
@@ -1204,6 +1248,8 @@ class DailyJournal {
 
                 // Refresh UI
                 this.renderFileTabs();
+                this.updateLoadButtonState();
+                
                 // Switch to last loaded? Or just stay.
                 // staying is probably safer unless user interaction triggered it.
                 
