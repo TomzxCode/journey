@@ -53,6 +53,7 @@ class DailyJournal {
         document.getElementById('clearDirectoryBtn').addEventListener('click', () => this.clearDirectory());
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
         document.getElementById('selectNoneFilesBtn').addEventListener('click', () => this.selectNoneFiles());
+        document.getElementById('fileFilterInput').addEventListener('input', (e) => this.filterFileList(e.target.value));
     }
 
     getDateString(date = new Date()) {
@@ -759,9 +760,11 @@ class DailyJournal {
     displayFileList(fileData, previouslySelectedPaths = null) {
         const fileList = document.getElementById('fileList');
         const fileCount = document.getElementById('fileCount');
+        const filterInput = document.getElementById('fileFilterInput');
 
         fileCount.textContent = `${fileData.length} files found`;
         fileList.innerHTML = '';
+        filterInput.value = '';
 
         fileData.forEach((fileInfo, index) => {
             const fileItem = document.createElement('div');
@@ -954,15 +957,52 @@ class DailyJournal {
     }
 
     selectAllFiles() {
-        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
-        checkboxes.forEach(checkbox => checkbox.checked = true);
+        const fileItems = document.querySelectorAll('.file-item');
+        fileItems.forEach(item => {
+            if (item.style.display !== 'none') {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = true;
+            }
+        });
         this.updateLoadButtonState();
     }
 
     selectNoneFiles() {
-        const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
-        checkboxes.forEach(checkbox => checkbox.checked = false);
+        const fileItems = document.querySelectorAll('.file-item');
+        fileItems.forEach(item => {
+            if (item.style.display !== 'none') {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = false;
+            }
+        });
         this.updateLoadButtonState();
+    }
+
+    filterFileList(filterText) {
+        const fileItems = document.querySelectorAll('.file-item');
+        const searchTerm = filterText.toLowerCase().trim();
+        let visibleCount = 0;
+
+        fileItems.forEach(item => {
+            const fileName = item.querySelector('.file-name').textContent.toLowerCase();
+            const filePath = item.querySelector('.file-path').textContent.toLowerCase();
+
+            if (searchTerm === '' || fileName.includes(searchTerm) || filePath.includes(searchTerm)) {
+                item.style.display = 'flex';
+                visibleCount++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        const fileCount = document.getElementById('fileCount');
+        const totalCount = fileItems.length;
+
+        if (searchTerm === '') {
+            fileCount.textContent = `${totalCount} files found`;
+        } else {
+            fileCount.textContent = `${visibleCount} of ${totalCount} files`;
+        }
     }
 
     updateLoadButtonState() {

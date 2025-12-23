@@ -297,6 +297,25 @@ button {
     font-style: italic;
 }
 
+.file-filter-input {
+    margin-bottom: 10px;
+}
+
+.file-filter-input input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+}
+
+.file-filter-input input[type="text"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
 .file-list {
     max-height: 300px;
     overflow-y: auto;
