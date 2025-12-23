@@ -55,21 +55,21 @@ class DailyJournal {
     }
 
     loadEntries() {
-        const stored = localStorage.getItem('journalEntries');
+        const stored = localStorage.getItem('journey.journalEntries');
         return stored ? JSON.parse(stored) : {};
     }
 
     saveEntries() {
-        localStorage.setItem('journalEntries', JSON.stringify(this.entries));
+        localStorage.setItem('journey.journalEntries', JSON.stringify(this.entries));
     }
 
     loadDirectoryEntries() {
-        const stored = localStorage.getItem('directoryEntries');
+        const stored = localStorage.getItem('journey.directoryEntries');
         return stored ? JSON.parse(stored) : {};
     }
 
     saveDirectoryEntries() {
-        localStorage.setItem('directoryEntries', JSON.stringify(this.directoryEntries));
+        localStorage.setItem('journey.directoryEntries', JSON.stringify(this.directoryEntries));
     }
 
     loadTodaysEntry() {
@@ -926,11 +926,11 @@ class DailyJournal {
                 json: document.getElementById('filterJson').checked
             }
         };
-        localStorage.setItem('directorySettings', JSON.stringify(settings));
+        localStorage.setItem('journey.directorySettings', JSON.stringify(settings));
     }
 
     loadDirectorySettings() {
-        const stored = localStorage.getItem('directorySettings');
+        const stored = localStorage.getItem('journey.directorySettings');
         if (stored) {
             const settings = JSON.parse(stored);
             document.getElementById('autoScanFiles').checked = settings.autoScan || false;
@@ -941,7 +941,7 @@ class DailyJournal {
     }
 
     clearDirectorySettings() {
-        localStorage.removeItem('directorySettings');
+        localStorage.removeItem('journey.directorySettings');
     }
 
     selectAllFiles() {
@@ -972,14 +972,14 @@ class DailyJournal {
 
     saveSelectedFilePaths(filePaths) {
         if (this.selectedDirectory) {
-            const key = `selectedFiles_${this.selectedDirectory.name}`;
+            const key = `journey.selectedFiles_${this.selectedDirectory.name}`;
             localStorage.setItem(key, JSON.stringify(filePaths));
         }
     }
 
     getSavedSelectedFilePaths() {
         if (this.selectedDirectory) {
-            const key = `selectedFiles_${this.selectedDirectory.name}`;
+            const key = `journey.selectedFiles_${this.selectedDirectory.name}`;
             const saved = localStorage.getItem(key);
             return saved ? JSON.parse(saved) : null;
         }
@@ -1041,7 +1041,7 @@ class DailyJournal {
 
     clearSelectedFilePaths() {
         if (this.selectedDirectory) {
-            const key = `selectedFiles_${this.selectedDirectory.name}`;
+            const key = `journey.selectedFiles_${this.selectedDirectory.name}`;
             localStorage.removeItem(key);
         }
     }
