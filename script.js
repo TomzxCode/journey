@@ -11,6 +11,12 @@ class DailyJournal {
     init() {
         this.updateCurrentDate();
         this.bindEvents();
+
+        // Parse directory entries on load
+        if (Object.keys(this.directoryEntries).length > 0) {
+            this.parseAllDirectoryEntries();
+        }
+
         this.generateYearTabs();
         this.generateActivityCalendar();
         this.displayPastEntries();
@@ -610,6 +616,15 @@ class DailyJournal {
         }
     }
 
+    parseAllDirectoryEntries() {
+        // Parse all directory entries and merge them into this.entries
+        Object.keys(this.directoryEntries).forEach(fileKey => {
+            const content = this.directoryEntries[fileKey];
+            this.parseImportedContent(content);
+        });
+        this.saveEntries();
+    }
+
     normalizeDateString(dateString) {
         // Convert YYYYMMDD to YYYY-MM-DD
         if (dateString.match(/^\d{8}$/)) {
@@ -836,6 +851,10 @@ class DailyJournal {
                 this.saveSelectedFilePaths(selectedFilePaths);
 
                 this.saveDirectoryEntries();
+
+                // Parse all directory entries and merge into main entries
+                this.parseAllDirectoryEntries();
+
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
@@ -1021,6 +1040,10 @@ class DailyJournal {
 
             if (loadedCount > 0) {
                 this.saveDirectoryEntries();
+
+                // Parse all directory entries and merge into main entries
+                this.parseAllDirectoryEntries();
+
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
