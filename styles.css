@@ -30,10 +30,21 @@ h1 {
     margin-bottom: 10px;
 }
 
-.date-display {
+.date-picker {
+    width: 100%;
+    padding: 12px 15px;
     font-size: 1.1rem;
-    color: #6c757d;
-    font-style: italic;
+    font-family: 'Georgia', serif;
+    color: #495057;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    transition: border-color 0.3s ease;
+}
+
+.date-picker:focus {
+    outline: none;
+    border-color: #007bff;
 }
 
 section {

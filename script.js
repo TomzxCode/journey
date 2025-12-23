@@ -5,11 +5,12 @@ class DailyJournal {
         this.currentFilter = 'yesterday';
         this.currentCalendarYear = new Date().getFullYear();
         this.similarEntriesTimeout = null;
+        this.selectedDate = new Date();
         this.init();
     }
 
     init() {
-        this.updateCurrentDate();
+        this.initializeDatePicker();
         this.bindEvents();
 
         // Parse directory entries on load
@@ -20,22 +21,17 @@ class DailyJournal {
         this.generateYearTabs();
         this.generateActivityCalendar();
         this.displayPastEntries();
-        this.loadTodaysEntry();
+        this.loadSelectedEntry();
         this.loadDirectorySettings();
     }
 
-    updateCurrentDate() {
-        const today = new Date();
-        const options = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        };
-        document.getElementById('currentDate').textContent = today.toLocaleDateString('en-US', options);
+    initializeDatePicker() {
+        const datePicker = document.getElementById('datePicker');
+        datePicker.value = this.getDateString(this.selectedDate);
     }
 
     bindEvents() {
+        document.getElementById('datePicker').addEventListener('change', (e) => this.onDateChange(e));
         document.getElementById('saveEntry').addEventListener('click', () => this.saveEntry());
         document.getElementById('clearEntry').addEventListener('click', () => this.clearEntry());
         document.getElementById('entryText').addEventListener('input', (e) => this.onEntryInput(e));
@@ -56,8 +52,19 @@ class DailyJournal {
         document.getElementById('fileFilterInput').addEventListener('input', (e) => this.filterFileList(e.target.value));
     }
 
+    onDateChange(e) {
+        // Parse the date string (YYYY-MM-DD) and create a date in local time
+        const [year, month, day] = e.target.value.split('-').map(Number);
+        this.selectedDate = new Date(year, month - 1, day);
+        this.loadSelectedEntry();
+        this.displayPastEntries();
+    }
+
     getDateString(date = new Date()) {
-        return date.toISOString().split('T')[0];
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     loadEntries() {
@@ -78,25 +85,25 @@ class DailyJournal {
         localStorage.setItem('journey.directoryEntries', JSON.stringify(this.directoryEntries));
     }
 
-    loadTodaysEntry() {
-        const today = this.getDateString();
-        const todaysEntry = this.entries[today] || '';
-        document.getElementById('entryText').value = todaysEntry;
+    loadSelectedEntry() {
+        const selectedDateStr = this.getDateString(this.selectedDate);
+        const entry = this.entries[selectedDateStr] || '';
+        document.getElementById('entryText').value = entry;
     }
 
     saveEntry() {
-        const today = this.getDateString();
+        const selectedDateStr = this.getDateString(this.selectedDate);
         const entryText = document.getElementById('entryText').value.trim();
 
         if (entryText) {
-            this.entries[today] = entryText;
+            this.entries[selectedDateStr] = entryText;
             this.saveEntries();
             this.generateYearTabs();
             this.generateActivityCalendar();
             this.displayPastEntries();
             this.showMessage('Entry saved successfully!', 'success');
         } else {
-            delete this.entries[today];
+            delete this.entries[selectedDateStr];
             this.saveEntries();
             this.generateYearTabs();
             this.generateActivityCalendar();
@@ -130,11 +137,11 @@ class DailyJournal {
 
         const words = this.extractKeywords(currentText);
         const similarEntries = [];
-        const today = this.getDateString();
+        const selectedDateStr = this.getDateString(this.selectedDate);
         const searchText = currentText.toLowerCase().trim();
 
         Object.keys(this.entries).forEach(date => {
-            if (date === today) return;
+            if (date === selectedDateStr) return;
 
             const entryText = this.entries[date];
             const entryWords = this.extractKeywords(entryText);
@@ -225,15 +232,16 @@ class DailyJournal {
     }
 
     getFilteredEntries() {
-        const today = new Date();
-        const todayStr = this.getDateString(today);
+        const selectedDateStr = this.getDateString(this.selectedDate);
 
         return Object.keys(this.entries)
             .filter(date => {
-                if (date === todayStr) return false;
+                if (date === selectedDateStr) return false;
 
-                const entryDate = new Date(date);
-                const daysDiff = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
+                // Parse date string properly to avoid timezone issues
+                const [year, month, day] = date.split('-').map(Number);
+                const entryDate = new Date(year, month - 1, day);
+                const daysDiff = Math.floor((this.selectedDate - entryDate) / (1000 * 60 * 60 * 24));
 
                 switch (this.currentFilter) {
                     case 'yesterday':
@@ -256,7 +264,9 @@ class DailyJournal {
     }
 
     formatDate(dateString) {
-        const date = new Date(dateString);
+        // Parse date string properly to avoid timezone issues
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
         const options = {
             weekday: 'short',
             year: 'numeric',
@@ -549,7 +559,7 @@ class DailyJournal {
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
-                this.loadTodaysEntry();
+                this.loadSelectedEntry();
                 this.showMessage('Journal imported successfully!', 'success');
             } catch (error) {
                 this.showMessage('Error importing journal. Please check the file format.', 'error');
@@ -855,7 +865,7 @@ class DailyJournal {
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
-                this.loadTodaysEntry();
+                this.loadSelectedEntry();
                 this.showMessage(`Successfully loaded ${loadedCount} of ${selectedIndexes.length} selected files`, 'success');
             } else {
                 this.showMessage('No valid content found in selected files', 'error');
@@ -1077,7 +1087,7 @@ class DailyJournal {
                 this.generateYearTabs();
                 this.generateActivityCalendar();
                 this.displayPastEntries();
-                this.loadTodaysEntry();
+                this.loadSelectedEntry();
 
                 const missingCount = savedFilePaths.length - existingFiles.length;
                 let message = `Auto-loaded ${loadedCount} previously selected files`;
