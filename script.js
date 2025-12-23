@@ -303,7 +303,7 @@ class DailyJournal {
         // Get all years that have entries
         const entryYears = new Set();
         Object.keys(this.entries).forEach(dateString => {
-            const year = new Date(dateString).getFullYear();
+            const year = parseInt(dateString.split('-')[0]);
             entryYears.add(year);
         });
 
@@ -398,8 +398,13 @@ class DailyJournal {
             if (hasEntry) {
                 dayElement.addEventListener('mouseenter', (e) => this.showTooltip(e, dateString));
                 dayElement.addEventListener('mouseleave', () => this.hideTooltip());
-                dayElement.addEventListener('click', () => this.showEntryModal(dateString));
             }
+
+            dayElement.addEventListener('click', () => {
+                const datePicker = document.getElementById('datePicker');
+                datePicker.value = dateString;
+                datePicker.dispatchEvent(new Event('change'));
+            });
 
             calendarGrid.appendChild(dayElement);
         });
@@ -447,13 +452,7 @@ class DailyJournal {
         tooltip.className = 'tooltip';
 
         const entry = this.entries[dateString];
-        const date = new Date(dateString);
-        const formattedDate = date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
+        const formattedDate = this.formatDate(dateString);
 
         tooltip.innerHTML = `
             <div class="tooltip-date">${formattedDate}</div>
@@ -480,7 +479,10 @@ class DailyJournal {
         const entry = this.entries[dateString];
         if (!entry) return;
 
-        const date = new Date(dateString);
+        // Use format date to avoid timezone issues
+        // We want the long format here, so we might need to adjust formatDate or just do it locally but safely
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
         const formattedDate = date.toLocaleDateString('en-US', {
             weekday: 'long',
             month: 'long',
@@ -541,8 +543,12 @@ class DailyJournal {
 
     scrollToEntry(dateString) {
         // Switch to appropriate filter and scroll to entry
-        const date = new Date(dateString);
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
         const today = new Date();
+        // Reset today to midnight for accurate day difference comparison
+        today.setHours(0, 0, 0, 0);
+        
         const daysDiff = Math.floor((today - date) / (1000 * 60 * 60 * 24));
 
         let filter = 'lastYear';
