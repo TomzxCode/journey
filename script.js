@@ -210,7 +210,7 @@ class DailyJournal {
         return stored ? JSON.parse(stored) : {};
     }
 
-    saveCurrentEntries() {
+    async saveCurrentEntries() {
         const currentFile = this.files[this.activeFileIndex];
         
         if (currentFile.type === 'local') {
@@ -224,6 +224,18 @@ class DailyJournal {
             // Update directoryEntries
             this.directoryEntries[currentFile.path] = newContent;
             this.saveDirectoryEntries();
+
+            // Write to disk if handle is available
+            if (currentFile.handle) {
+                try {
+                    const writable = await currentFile.handle.createWritable();
+                    await writable.write(newContent);
+                    await writable.close();
+                } catch (error) {
+                    console.error('Failed to write to disk:', error);
+                    this.showMessage('Failed to save to disk', 'error');
+                }
+            }
         }
     }
 
@@ -248,20 +260,20 @@ class DailyJournal {
         document.getElementById('entryText').value = entry;
     }
 
-    saveEntry() {
+    async saveEntry() {
         const selectedDateStr = this.getDateString(this.selectedDate);
         const entryText = document.getElementById('entryText').value.trim();
         const currentEntries = this.entries; // Get current file's entries
 
         if (entryText) {
             currentEntries[selectedDateStr] = entryText;
-            this.saveCurrentEntries();
+            await this.saveCurrentEntries();
             this.refreshView();
             this.showMessage('Entry saved successfully!', 'success');
         } else {
             if (currentEntries[selectedDateStr]) {
                 delete currentEntries[selectedDateStr];
-                this.saveCurrentEntries();
+                await this.saveCurrentEntries();
                 this.refreshView();
                 this.showMessage('Entry cleared.', 'info');
             }
@@ -639,7 +651,7 @@ class DailyJournal {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 // Determine which file to update. 
                 // Currently, importJournal updates the current tab.
@@ -649,7 +661,7 @@ class DailyJournal {
                 const currentEntries = this.entries;
                 Object.assign(currentEntries, entries);
                 
-                this.saveCurrentEntries();
+                await this.saveCurrentEntries();
                 this.refreshView();
                 this.showMessage('Journal imported successfully into current tab!', 'success');
             } catch (error) {
@@ -938,7 +950,8 @@ class DailyJournal {
                         type: 'file',
                         path: fileKey,
                         content: content,
-                        entries: entries
+                        entries: entries,
+                        handle: fileInfo.handle
                     };
 
                     if (existingFileIndex >= 0) {
@@ -1170,7 +1183,8 @@ class DailyJournal {
                         type: 'file',
                         path: fileKey,
                         content: content,
-                        entries: entries
+                        entries: entries,
+                        handle: fileInfo.handle
                     };
 
                     if (existingFileIndex >= 0) {
