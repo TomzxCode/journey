@@ -218,7 +218,6 @@ Another productive day...
 Journey uses browser localStorage with separate storage keys:
 
 - `journey.journalEntries` - Manually written entries
-- `journey.directoryEntries` - Entries loaded from directory files
 - `journey.directorySettings` - Directory selection preferences
 - `journey.selectedFiles_{directoryName}` - File selection preferences
 

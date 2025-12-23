@@ -131,7 +131,6 @@ journey/
 
 Journey uses browser localStorage with the following keys:
 - `journey.journalEntries` - Manually entered journal entries
-- `journey.directoryEntries` - Entries loaded from directory files
 - `journey.directorySettings` - Directory selection preferences
 - `journey.selectedFiles_{directoryName}` - Remember which files were loaded
 

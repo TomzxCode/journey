@@ -152,10 +152,6 @@ Journey uses browser localStorage with a multi-key strategy:
     "2024-01-15": "Entry content...",
     "2024-01-16": "More content..."
   },
-  "journey.directoryEntries": {
-    "2024-01-15": "Loaded from file...",
-    "2024-01-17": "Another file..."
-  },
   "journey.directorySettings": {
     "directoryName": "my-journals",
     "autoScan": true,
@@ -173,7 +169,6 @@ Journey uses browser localStorage with a multi-key strategy:
 | Key | Purpose | Format |
 |-----|---------|--------|
 | `journey.journalEntries` | Manually written entries | `{ date: content }` object |
-| `journey.directoryEntries` | Directory-loaded entries | `{ date: content }` object |
 | `journey.directorySettings` | Directory preferences | Configuration object |
 | `journey.selectedFiles_{name}` | File selection memory | Array of file paths |
 
@@ -451,11 +446,7 @@ async function loadSelectedFiles(selectedHandles) {
     Object.assign(directoryEntries, entries);
   }
 
-  // Save to localStorage
-  localStorage.setItem(
-    'journey.directoryEntries',
-    JSON.stringify(directoryEntries)
-  );
+  // Content of files read from disk is not persisted to local storage
 
   // Update UI
   renderActivityCalendar();

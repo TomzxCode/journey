@@ -1,6 +1,6 @@
 class DailyJournal {
     constructor() {
-        this.directoryEntries = this.loadDirectoryEntries();
+        this.directoryEntries = {};
         this.files = [];
         this.activeFileIndex = 0;
         this.currentFilter = 'yesterday';
@@ -38,7 +38,7 @@ class DailyJournal {
             // Extract filename from path
             const name = path.split('/').pop() || path;
             const entries = this.parseContentToEntries(content);
-            
+
             this.files.push({
                 name: name,
                 type: 'file',
@@ -58,7 +58,7 @@ class DailyJournal {
         this.displayPastEntries();
         this.generateYearTabs();
         this.generateActivityCalendar();
-        
+
         // Clear similar entries when switching views
         document.getElementById('similarEntriesContainer').innerHTML = '';
     }
@@ -96,13 +96,13 @@ class DailyJournal {
                 document.getElementById('fileTabsContainer').classList.toggle('open');
             });
         }
-        
+
         // Close mobile menu when clicking outside
         document.addEventListener('click', (e) => {
             const container = document.getElementById('fileTabsContainer');
             const toggle = document.getElementById('mobileTabToggle');
-            if (container.classList.contains('open') && 
-                !container.contains(e.target) && 
+            if (container.classList.contains('open') &&
+                !container.contains(e.target) &&
                 e.target !== toggle) {
                 container.classList.remove('open');
             }
@@ -113,7 +113,7 @@ class DailyJournal {
         const tabsContainer = document.getElementById('fileTabs');
         const containerWrapper = document.getElementById('fileTabsContainer');
         const mobileToggle = document.getElementById('mobileTabToggle');
-        
+
         if (this.files.length <= 1) {
             containerWrapper.style.display = 'none';
             if (mobileToggle) mobileToggle.style.display = 'none';
@@ -124,13 +124,13 @@ class DailyJournal {
         if (mobileToggle && window.innerWidth <= 600) {
             mobileToggle.style.display = 'block';
         }
-        
+
         tabsContainer.innerHTML = '';
 
         this.files.forEach((file, index) => {
             const tab = document.createElement('div');
             tab.className = `file-tab ${index === this.activeFileIndex ? 'active' : ''}`;
-            
+
             const nameSpan = document.createElement('span');
             nameSpan.textContent = file.name;
             tab.appendChild(nameSpan);
@@ -155,11 +155,11 @@ class DailyJournal {
 
     switchFileTab(index) {
         if (index === this.activeFileIndex) return;
-        
+
         this.activeFileIndex = index;
         this.renderFileTabs();
         this.refreshView();
-        
+
         // Close mobile menu if open
         document.getElementById('fileTabsContainer').classList.remove('open');
     }
@@ -168,11 +168,10 @@ class DailyJournal {
         if (index === 0) return; // Cannot close default journal
 
         const fileToRemove = this.files[index];
-        
+
         // Remove from directoryEntries
         if (fileToRemove.type === 'file') {
             delete this.directoryEntries[fileToRemove.path];
-            this.saveDirectoryEntries();
         }
 
         // Remove from files array
@@ -213,7 +212,7 @@ class DailyJournal {
 
     async saveCurrentEntries() {
         const currentFile = this.files[this.activeFileIndex];
-        
+
         if (currentFile.type === 'local') {
             localStorage.setItem('journey.journalEntries', JSON.stringify(currentFile.entries));
         } else if (currentFile.type === 'file') {
@@ -221,10 +220,9 @@ class DailyJournal {
             // This assumes a simple Markdown format for saving back
             const newContent = this.entriesToMarkdown(currentFile.entries);
             currentFile.content = newContent;
-            
+
             // Update directoryEntries
             this.directoryEntries[currentFile.path] = newContent;
-            this.saveDirectoryEntries();
 
             // Write to disk if handle is available
             if (currentFile.handle) {
@@ -244,15 +242,6 @@ class DailyJournal {
         // Sort dates
         const sortedDates = Object.keys(entries).sort();
         return sortedDates.map(date => `# ${date}\n\n${entries[date]}`).join('\n\n');
-    }
-
-    loadDirectoryEntries() {
-        const stored = localStorage.getItem('journey.directoryEntries');
-        return stored ? JSON.parse(stored) : {};
-    }
-
-    saveDirectoryEntries() {
-        localStorage.setItem('journey.directoryEntries', JSON.stringify(this.directoryEntries));
     }
 
     loadSelectedEntry() {
@@ -654,14 +643,14 @@ class DailyJournal {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                // Determine which file to update. 
+                // Determine which file to update.
                 // Currently, importJournal updates the current tab.
                 const entries = this.parseContentToEntries(e.target.result);
-                
+
                 // Merge into current tab entries
                 const currentEntries = this.entries;
                 Object.assign(currentEntries, entries);
-                
+
                 await this.saveCurrentEntries();
                 this.refreshView();
                 this.showMessage('Journal imported successfully into current tab!', 'success');
@@ -676,7 +665,7 @@ class DailyJournal {
         const entries = {};
         // Try multiple date formats
         const markdownDateRegex = /^#\s*(\d{4}-\d{2}-\d{2})$/gm;
-        
+
         // First try markdown format (# YYYY-MM-DD)
         let sections = content.split(markdownDateRegex).slice(1);
 
@@ -851,7 +840,7 @@ class DailyJournal {
             this.displayFileList(fileData);
 
             const fileListContainer = document.getElementById('fileListContainer');
-            
+
             fileListContainer.style.display = 'block';
             this.updateLoadButtonState();
 
@@ -937,17 +926,17 @@ class DailyJournal {
 
             // 1. Remove files that are unchecked but currently open
             const unselectedPaths = unselectedIndexes.map(index => this.foundFiles[index].relativePath);
-            
+
             // Iterate backwards through this.files to safely remove
             for (let i = this.files.length - 1; i >= 0; i--) {
                 const file = this.files[i];
                 if (file.type === 'file' && unselectedPaths.includes(file.path)) {
                     // Remove from directoryEntries
                     delete this.directoryEntries[file.path];
-                    
+
                     // Remove from files array
                     this.files.splice(i, 1);
-                    
+
                     removedCount++;
                 }
             }
@@ -973,7 +962,7 @@ class DailyJournal {
 
                     // Add or update file tab
                     const existingFileIndex = this.files.findIndex(f => f.path === fileKey);
-                    
+
                     const newFileObj = {
                         name: fileName,
                         type: 'file',
@@ -999,13 +988,11 @@ class DailyJournal {
             const selectedFilePaths = selectedIndexes.map(index => this.foundFiles[index].relativePath);
             this.saveSelectedFilePaths(selectedFilePaths);
 
-            this.saveDirectoryEntries();
-
             // Refresh UI
             this.renderFileTabs();
             this.refreshView();
             this.updateLoadButtonState();
-            
+
             this.showMessage(`List updated: ${loadedCount} loaded, ${removedCount} removed`, 'success');
 
         } catch (error) {
@@ -1143,27 +1130,27 @@ class DailyJournal {
     updateLoadButtonState() {
         const updateBtn = document.getElementById('updateFilesBtn');
         const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
-        
+
         // Create a Set of open file paths for fast lookup
         const openPaths = new Set(this.files.filter(f => f.type === 'file').map(f => f.path));
-        
+
         let hasChanges = false;
-        
+
         for (const cb of checkboxes) {
             const index = parseInt(cb.id.replace('file-', ''));
             const fileInfo = this.foundFiles[index];
             if (!fileInfo) continue;
-            
+
             const path = fileInfo.relativePath;
             const isChecked = cb.checked;
             const isOpen = openPaths.has(path);
-            
+
             if (isChecked !== isOpen) {
                 hasChanges = true;
                 break;
             }
         }
-        
+
         updateBtn.disabled = !hasChanges;
     }
 
@@ -1221,7 +1208,7 @@ class DailyJournal {
 
                     // Add or update file tab
                     const existingFileIndex = this.files.findIndex(f => f.path === fileKey);
-                    
+
                     const newFileObj = {
                         name: fileInfo.file.name,
                         type: 'file',
@@ -1244,15 +1231,13 @@ class DailyJournal {
             }
 
             if (loadedCount > 0) {
-                this.saveDirectoryEntries();
-
                 // Refresh UI
                 this.renderFileTabs();
                 this.updateLoadButtonState();
-                
+
                 // Switch to last loaded? Or just stay.
                 // staying is probably safer unless user interaction triggered it.
-                
+
                 const missingCount = savedFilePaths.length - existingFiles.length;
                 let message = `Auto-loaded ${loadedCount} previously selected files`;
                 if (missingCount > 0) {
