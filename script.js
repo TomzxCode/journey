@@ -73,6 +73,7 @@ class DailyJournal {
         document.getElementById('saveEntry').addEventListener('click', () => this.saveEntry());
         document.getElementById('clearEntry').addEventListener('click', () => this.clearEntry());
         document.getElementById('entryText').addEventListener('input', (e) => this.onEntryInput(e));
+        document.getElementById('entryText').addEventListener('blur', () => this.checkAndSaveEntry());
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.filterPastEntries(e.target.dataset.filter));
@@ -248,6 +249,16 @@ class DailyJournal {
         const selectedDateStr = this.getDateString(this.selectedDate);
         const entry = this.entries[selectedDateStr] || '';
         document.getElementById('entryText').value = entry;
+    }
+
+    checkAndSaveEntry() {
+        const selectedDateStr = this.getDateString(this.selectedDate);
+        const savedText = this.entries[selectedDateStr] || '';
+        const currentText = document.getElementById('entryText').value.trim();
+
+        if (savedText !== currentText) {
+            this.saveEntry();
+        }
     }
 
     async saveEntry() {
