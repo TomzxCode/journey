@@ -241,17 +241,32 @@ class DailyJournal {
                 // Parse date string properly to avoid timezone issues
                 const [year, month, day] = date.split('-').map(Number);
                 const entryDate = new Date(year, month - 1, day);
-                const daysDiff = Math.floor((this.selectedDate - entryDate) / (1000 * 60 * 60 * 24));
 
                 switch (this.currentFilter) {
-                    case 'yesterday':
-                        return daysDiff === 1;
-                    case 'lastWeek':
-                        return daysDiff >= 1 && daysDiff <= 7;
-                    case 'lastMonth':
-                        return daysDiff >= 1 && daysDiff <= 30;
-                    case 'lastYear':
-                        return daysDiff >= 1 && daysDiff <= 365;
+                    case 'yesterday': {
+                        // Show only yesterday's entry
+                        const yesterday = new Date(this.selectedDate);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        return date === this.getDateString(yesterday);
+                    }
+                    case 'lastWeek': {
+                        // Show only the entry from 7 days ago
+                        const lastWeek = new Date(this.selectedDate);
+                        lastWeek.setDate(lastWeek.getDate() - 7);
+                        return date === this.getDateString(lastWeek);
+                    }
+                    case 'lastMonth': {
+                        // Show only the entry from the same day last month
+                        const lastMonth = new Date(this.selectedDate);
+                        lastMonth.setMonth(lastMonth.getMonth() - 1);
+                        return date === this.getDateString(lastMonth);
+                    }
+                    case 'lastYear': {
+                        // Show only the entry from the same day last year
+                        const lastYear = new Date(this.selectedDate);
+                        lastYear.setFullYear(lastYear.getFullYear() - 1);
+                        return date === this.getDateString(lastYear);
+                    }
                     default:
                         return false;
                 }
