@@ -246,12 +246,6 @@ button {
     margin-right: 8px;
 }
 
-.auto-scan-toggle label {
-    color: #495057;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
 .file-list-container {
     margin-top: 20px;
     background-color: #f8f9fa;
@@ -353,15 +347,6 @@ button {
     font-size: 0.8rem;
     color: #6c757d;
     margin-left: 10px;
-}
-
-#scanDirectoryBtn {
-    background-color: #ffc107;
-    color: #212529;
-}
-
-#scanDirectoryBtn:hover:not(:disabled) {
-    background-color: #e0a800;
 }
 
 #loadSelectedBtn {

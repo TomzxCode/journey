@@ -49,7 +49,6 @@ class DailyJournal {
         document.getElementById('importFile').addEventListener('change', (e) => this.handleFileImport(e));
 
         document.getElementById('selectDirectoryBtn').addEventListener('click', () => this.selectDirectory());
-        document.getElementById('scanDirectoryBtn').addEventListener('click', () => this.scanDirectoryFiles());
         document.getElementById('loadSelectedBtn').addEventListener('click', () => this.loadSelectedFiles());
         document.getElementById('clearDirectoryBtn').addEventListener('click', () => this.clearDirectory());
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
@@ -706,26 +705,21 @@ class DailyJournal {
 
             const directoryInfo = document.getElementById('directoryInfo');
             const directoryPath = document.getElementById('selectedDirectoryPath');
-            const scanBtn = document.getElementById('scanDirectoryBtn');
             const clearBtn = document.getElementById('clearDirectoryBtn');
 
             directoryPath.textContent = directoryHandle.name;
             directoryInfo.style.display = 'block';
-            scanBtn.disabled = false;
             clearBtn.disabled = false;
 
             this.saveDirectorySettings();
 
+            // Always scan for files after directory selection
+            await this.scanDirectoryFiles();
+
             // Check if we should auto-load previously selected files
             const savedFilePaths = this.getSavedSelectedFilePaths();
-            const shouldAutoLoad = savedFilePaths && savedFilePaths.length > 0;
-
-            if (document.getElementById('autoScanFiles').checked || shouldAutoLoad) {
-                await this.scanDirectoryFiles();
-
-                if (shouldAutoLoad) {
-                    await this.autoLoadPreviouslySelectedFiles(savedFilePaths);
-                }
+            if (savedFilePaths && savedFilePaths.length > 0) {
+                await this.autoLoadPreviouslySelectedFiles(savedFilePaths);
             }
 
             this.showMessage('Directory selected successfully!', 'success');
@@ -920,13 +914,11 @@ class DailyJournal {
 
         const directoryInfo = document.getElementById('directoryInfo');
         const fileListContainer = document.getElementById('fileListContainer');
-        const scanBtn = document.getElementById('scanDirectoryBtn');
         const loadBtn = document.getElementById('loadSelectedBtn');
         const clearBtn = document.getElementById('clearDirectoryBtn');
 
         directoryInfo.style.display = 'none';
         fileListContainer.style.display = 'none';
-        scanBtn.disabled = true;
         loadBtn.disabled = true;
         clearBtn.disabled = true;
 
@@ -938,7 +930,6 @@ class DailyJournal {
     saveDirectorySettings() {
         const settings = {
             directoryName: this.selectedDirectory?.name,
-            autoScan: document.getElementById('autoScanFiles').checked,
             fileFilters: {
                 markdown: document.getElementById('filterMarkdown').checked,
                 text: document.getElementById('filterText').checked,
@@ -952,7 +943,6 @@ class DailyJournal {
         const stored = localStorage.getItem('journey.directorySettings');
         if (stored) {
             const settings = JSON.parse(stored);
-            document.getElementById('autoScanFiles').checked = settings.autoScan || false;
             document.getElementById('filterMarkdown').checked = settings.fileFilters?.markdown !== false;
             document.getElementById('filterText').checked = settings.fileFilters?.text !== false;
             document.getElementById('filterJson').checked = settings.fileFilters?.json || false;
