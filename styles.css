@@ -118,10 +118,22 @@ button {
     background-color: #5a6268;
 }
 
+.past-entries-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.past-entries-header h2 {
+    margin-bottom: 0;
+}
+
 .time-filters {
     display: flex;
     gap: 10px;
-    margin-bottom: 20px;
     flex-wrap: wrap;
 }
 
