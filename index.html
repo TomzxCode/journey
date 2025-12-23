@@ -9,6 +9,10 @@
 <body>
     <div class="container">
         <main>
+            <div class="file-tabs-container" id="fileTabsContainer" style="display: none;">
+                <div class="file-tabs" id="fileTabs"></div>
+            </div>
+
             <section class="entry-section">
                 <input type="date" class="date-picker" id="datePicker">
                 <textarea id="entryText" placeholder="What's on your mind today?"></textarea>
@@ -104,6 +108,7 @@
         </main>
     </div>
 
+    <div class="mobile-tab-toggle" id="mobileTabToggle" style="display: none;">📂</div>
     <script src="script.js"></script>
 </body>
 </html>

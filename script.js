@@ -1,28 +1,66 @@
 class DailyJournal {
     constructor() {
-        this.entries = this.loadEntries();
         this.directoryEntries = this.loadDirectoryEntries();
+        this.files = [];
+        this.activeFileIndex = 0;
         this.currentFilter = 'yesterday';
         this.currentCalendarYear = new Date().getFullYear();
         this.similarEntriesTimeout = null;
         this.selectedDate = new Date();
+        this.selectedDirectory = null;
+        this.foundFiles = [];
         this.init();
     }
 
     init() {
         this.initializeDatePicker();
         this.bindEvents();
+        this.initializeFiles();
+        this.renderFileTabs();
+        this.refreshView();
+        this.loadDirectorySettings();
+    }
 
-        // Parse directory entries on load
-        if (Object.keys(this.directoryEntries).length > 0) {
-            this.parseAllDirectoryEntries();
-        }
+    initializeFiles() {
+        // 1. Default Journal (Tab 0)
+        const defaultEntries = this.loadEntriesFromLocalStorage();
+        this.files.push({
+            name: 'My Journal',
+            type: 'local',
+            path: 'local',
+            entries: defaultEntries,
+            content: '' // Not used for local type
+        });
 
+        // 2. Load cached directory files as tabs
+        Object.keys(this.directoryEntries).forEach(path => {
+            const content = this.directoryEntries[path];
+            // Extract filename from path
+            const name = path.split('/').pop() || path;
+            const entries = this.parseContentToEntries(content);
+            
+            this.files.push({
+                name: name,
+                type: 'file',
+                path: path,
+                content: content,
+                entries: entries
+            });
+        });
+    }
+
+    get entries() {
+        return this.files[this.activeFileIndex].entries;
+    }
+
+    refreshView() {
+        this.loadSelectedEntry();
+        this.displayPastEntries();
         this.generateYearTabs();
         this.generateActivityCalendar();
-        this.displayPastEntries();
-        this.loadSelectedEntry();
-        this.loadDirectorySettings();
+        
+        // Clear similar entries when switching views
+        document.getElementById('similarEntriesContainer').innerHTML = '';
     }
 
     initializeDatePicker() {
@@ -50,6 +88,106 @@ class DailyJournal {
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
         document.getElementById('selectNoneFilesBtn').addEventListener('click', () => this.selectNoneFiles());
         document.getElementById('fileFilterInput').addEventListener('input', (e) => this.filterFileList(e.target.value));
+
+        // Mobile tab toggle
+        const mobileToggle = document.getElementById('mobileTabToggle');
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', () => {
+                document.getElementById('fileTabsContainer').classList.toggle('open');
+            });
+        }
+        
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.getElementById('fileTabsContainer');
+            const toggle = document.getElementById('mobileTabToggle');
+            if (container.classList.contains('open') && 
+                !container.contains(e.target) && 
+                e.target !== toggle) {
+                container.classList.remove('open');
+            }
+        });
+    }
+
+    renderFileTabs() {
+        const tabsContainer = document.getElementById('fileTabs');
+        const containerWrapper = document.getElementById('fileTabsContainer');
+        const mobileToggle = document.getElementById('mobileTabToggle');
+        
+        if (this.files.length <= 1) {
+            containerWrapper.style.display = 'none';
+            if (mobileToggle) mobileToggle.style.display = 'none';
+            return;
+        }
+
+        containerWrapper.style.display = 'block';
+        if (mobileToggle && window.innerWidth <= 600) {
+            mobileToggle.style.display = 'block';
+        }
+        
+        tabsContainer.innerHTML = '';
+
+        this.files.forEach((file, index) => {
+            const tab = document.createElement('div');
+            tab.className = `file-tab ${index === this.activeFileIndex ? 'active' : ''}`;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = file.name;
+            tab.appendChild(nameSpan);
+
+            // Add close button for non-default tabs
+            if (index > 0) {
+                const closeBtn = document.createElement('span');
+                closeBtn.className = 'close-tab';
+                closeBtn.innerHTML = '&times;';
+                closeBtn.title = 'Close file';
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeFileTab(index);
+                });
+                tab.appendChild(closeBtn);
+            }
+
+            tab.addEventListener('click', () => this.switchFileTab(index));
+            tabsContainer.appendChild(tab);
+        });
+    }
+
+    switchFileTab(index) {
+        if (index === this.activeFileIndex) return;
+        
+        this.activeFileIndex = index;
+        this.renderFileTabs();
+        this.refreshView();
+        
+        // Close mobile menu if open
+        document.getElementById('fileTabsContainer').classList.remove('open');
+    }
+
+    closeFileTab(index) {
+        if (index === 0) return; // Cannot close default journal
+
+        const fileToRemove = this.files[index];
+        
+        // Remove from directoryEntries
+        if (fileToRemove.type === 'file') {
+            delete this.directoryEntries[fileToRemove.path];
+            this.saveDirectoryEntries();
+        }
+
+        // Remove from files array
+        this.files.splice(index, 1);
+
+        // Adjust active index
+        if (this.activeFileIndex === index) {
+            this.activeFileIndex = Math.max(0, index - 1);
+        } else if (this.activeFileIndex > index) {
+            this.activeFileIndex--;
+        }
+
+        this.renderFileTabs();
+        this.refreshView();
+        this.showMessage(`Closed ${fileToRemove.name}`, 'info');
     }
 
     onDateChange(e) {
@@ -67,13 +205,32 @@ class DailyJournal {
         return `${year}-${month}-${day}`;
     }
 
-    loadEntries() {
+    loadEntriesFromLocalStorage() {
         const stored = localStorage.getItem('journey.journalEntries');
         return stored ? JSON.parse(stored) : {};
     }
 
-    saveEntries() {
-        localStorage.setItem('journey.journalEntries', JSON.stringify(this.entries));
+    saveCurrentEntries() {
+        const currentFile = this.files[this.activeFileIndex];
+        
+        if (currentFile.type === 'local') {
+            localStorage.setItem('journey.journalEntries', JSON.stringify(currentFile.entries));
+        } else if (currentFile.type === 'file') {
+            // Regenerate content string from entries
+            // This assumes a simple Markdown format for saving back
+            const newContent = this.entriesToMarkdown(currentFile.entries);
+            currentFile.content = newContent;
+            
+            // Update directoryEntries
+            this.directoryEntries[currentFile.path] = newContent;
+            this.saveDirectoryEntries();
+        }
+    }
+
+    entriesToMarkdown(entries) {
+        // Sort dates
+        const sortedDates = Object.keys(entries).sort();
+        return sortedDates.map(date => `# ${date}\n\n${entries[date]}`).join('\n\n');
     }
 
     loadDirectoryEntries() {
@@ -94,21 +251,20 @@ class DailyJournal {
     saveEntry() {
         const selectedDateStr = this.getDateString(this.selectedDate);
         const entryText = document.getElementById('entryText').value.trim();
+        const currentEntries = this.entries; // Get current file's entries
 
         if (entryText) {
-            this.entries[selectedDateStr] = entryText;
-            this.saveEntries();
-            this.generateYearTabs();
-            this.generateActivityCalendar();
-            this.displayPastEntries();
+            currentEntries[selectedDateStr] = entryText;
+            this.saveCurrentEntries();
+            this.refreshView();
             this.showMessage('Entry saved successfully!', 'success');
         } else {
-            delete this.entries[selectedDateStr];
-            this.saveEntries();
-            this.generateYearTabs();
-            this.generateActivityCalendar();
-            this.displayPastEntries();
-            this.showMessage('Entry cleared.', 'info');
+            if (currentEntries[selectedDateStr]) {
+                delete currentEntries[selectedDateStr];
+                this.saveCurrentEntries();
+                this.refreshView();
+                this.showMessage('Entry cleared.', 'info');
+            }
         }
     }
 
@@ -139,11 +295,12 @@ class DailyJournal {
         const similarEntries = [];
         const selectedDateStr = this.getDateString(this.selectedDate);
         const searchText = currentText.toLowerCase().trim();
+        const currentEntries = this.entries;
 
-        Object.keys(this.entries).forEach(date => {
+        Object.keys(currentEntries).forEach(date => {
             if (date === selectedDateStr) return;
 
-            const entryText = this.entries[date];
+            const entryText = currentEntries[date];
             const entryWords = this.extractKeywords(entryText);
 
             // Check for exact substring matches (for names, specific phrases)
@@ -233,8 +390,9 @@ class DailyJournal {
 
     getFilteredEntries() {
         const selectedDateStr = this.getDateString(this.selectedDate);
+        const currentEntries = this.entries;
 
-        return Object.keys(this.entries)
+        return Object.keys(currentEntries)
             .filter(date => {
                 if (date === selectedDateStr) return false;
 
@@ -274,7 +432,7 @@ class DailyJournal {
             .sort((a, b) => new Date(b) - new Date(a))
             .map(date => ({
                 date,
-                content: this.entries[date]
+                content: currentEntries[date]
             }));
     }
 
@@ -299,10 +457,11 @@ class DailyJournal {
     generateYearTabs() {
         const yearTabsContainer = document.getElementById('yearTabs');
         yearTabsContainer.innerHTML = '';
+        const currentEntries = this.entries;
 
         // Get all years that have entries
         const entryYears = new Set();
-        Object.keys(this.entries).forEach(dateString => {
+        Object.keys(currentEntries).forEach(dateString => {
             const year = parseInt(dateString.split('-')[0]);
             entryYears.add(year);
         });
@@ -362,19 +521,15 @@ class DailyJournal {
         const currentDate = new Date(startDate);
 
         // Generate enough weeks to cover the entire year
-        // Continue until we're past December 31st of the selected year
         while (currentDate.getFullYear() <= this.currentCalendarYear) {
             for (let day = 0; day < 7; day++) {
                 days.push(new Date(currentDate));
                 currentDate.setDate(currentDate.getDate() + 1);
 
-                // Break if we've gone past the year
                 if (currentDate.getFullYear() > this.currentCalendarYear && currentDate.getDate() > 7) {
                     break;
                 }
             }
-
-            // Break if we've covered enough weeks past the end of the year
             if (currentDate.getFullYear() > this.currentCalendarYear && currentDate.getDate() > 7) {
                 break;
             }
@@ -383,13 +538,15 @@ class DailyJournal {
         // Generate month labels
         this.generateMonthLabels(days, monthsContainer);
 
+        const currentEntries = this.entries;
+
         // Generate calendar days
         days.forEach((date, index) => {
             const dayElement = document.createElement('div');
             dayElement.className = 'calendar-day';
 
             const dateString = this.getDateString(date);
-            const hasEntry = this.entries.hasOwnProperty(dateString);
+            const hasEntry = currentEntries.hasOwnProperty(dateString);
             const level = hasEntry ? this.getActivityLevel(dateString) : 0;
 
             dayElement.classList.add(`level-${level}`);
@@ -417,7 +574,6 @@ class DailyJournal {
         let currentMonth = -1;
         let monthElements = [];
 
-        // Create 53 month label slots (one for each week)
         for (let week = 0; week < 53; week++) {
             const weekStartDate = days[week * 7];
             const month = weekStartDate.getMonth();
@@ -425,7 +581,6 @@ class DailyJournal {
             const monthElement = document.createElement('div');
             monthElement.className = 'calendar-month';
 
-            // Only show month name if it's a new month and we're not at the very start
             if (month !== currentMonth && week > 0) {
                 monthElement.textContent = monthNames[month];
                 currentMonth = month;
@@ -475,29 +630,6 @@ class DailyJournal {
         }
     }
 
-    scrollToEntry(dateString) {
-        // Switch to appropriate filter and scroll to entry
-        const [year, month, day] = dateString.split('-').map(Number);
-        const date = new Date(year, month - 1, day);
-        const today = new Date();
-        // Reset today to midnight for accurate day difference comparison
-        today.setHours(0, 0, 0, 0);
-        
-        const daysDiff = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-
-        let filter = 'lastYear';
-        if (daysDiff === 1) filter = 'yesterday';
-        else if (daysDiff <= 7) filter = 'lastWeek';
-        else if (daysDiff <= 30) filter = 'lastMonth';
-
-        this.filterPastEntries(filter);
-
-        // Scroll to past entries section
-        document.querySelector('.past-entries').scrollIntoView({
-            behavior: 'smooth'
-        });
-    }
-
     importJournal() {
         document.getElementById('importFile').click();
     }
@@ -509,13 +641,17 @@ class DailyJournal {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                this.parseImportedContent(e.target.result);
-                this.saveEntries();
-                this.generateYearTabs();
-                this.generateActivityCalendar();
-                this.displayPastEntries();
-                this.loadSelectedEntry();
-                this.showMessage('Journal imported successfully!', 'success');
+                // Determine which file to update. 
+                // Currently, importJournal updates the current tab.
+                const entries = this.parseContentToEntries(e.target.result);
+                
+                // Merge into current tab entries
+                const currentEntries = this.entries;
+                Object.assign(currentEntries, entries);
+                
+                this.saveCurrentEntries();
+                this.refreshView();
+                this.showMessage('Journal imported successfully into current tab!', 'success');
             } catch (error) {
                 this.showMessage('Error importing journal. Please check the file format.', 'error');
             }
@@ -523,11 +659,11 @@ class DailyJournal {
         reader.readAsText(file);
     }
 
-    parseImportedContent(content) {
+    parseContentToEntries(content) {
+        const entries = {};
         // Try multiple date formats
         const markdownDateRegex = /^#\s*(\d{4}-\d{2}-\d{2})$/gm;
-        const rawDateRegex = /^(\d{8}|\d{4}-\d{2}-\d{2}|\d{4}\/\d{2}\/\d{2})$/gm;
-
+        
         // First try markdown format (# YYYY-MM-DD)
         let sections = content.split(markdownDateRegex).slice(1);
 
@@ -548,7 +684,7 @@ class DailyJournal {
                     if (currentDate && currentEntry.length > 0) {
                         const normalizedDate = this.normalizeDateString(currentDate);
                         if (this.isValidDate(normalizedDate)) {
-                            this.entries[normalizedDate] = currentEntry.join('\n').trim();
+                            entries[normalizedDate] = currentEntry.join('\n').trim();
                         }
                     }
 
@@ -565,7 +701,7 @@ class DailyJournal {
             if (currentDate && currentEntry.length > 0) {
                 const normalizedDate = this.normalizeDateString(currentDate);
                 if (this.isValidDate(normalizedDate)) {
-                    this.entries[normalizedDate] = currentEntry.join('\n').trim();
+                    entries[normalizedDate] = currentEntry.join('\n').trim();
                 }
             }
         } else {
@@ -575,19 +711,11 @@ class DailyJournal {
                 const entryContent = sections[i + 1] ? sections[i + 1].trim() : '';
 
                 if (entryContent && this.isValidDate(date)) {
-                    this.entries[date] = entryContent;
+                    entries[date] = entryContent;
                 }
             }
         }
-    }
-
-    parseAllDirectoryEntries() {
-        // Parse all directory entries and merge them into this.entries
-        Object.keys(this.directoryEntries).forEach(fileKey => {
-            const content = this.directoryEntries[fileKey];
-            this.parseImportedContent(content);
-        });
-        this.saveEntries();
+        return entries;
     }
 
     normalizeDateString(dateString) {
@@ -611,16 +739,16 @@ class DailyJournal {
     }
 
     exportJournal() {
-        const sortedDates = Object.keys(this.entries).sort();
-        const markdown = sortedDates.map(date =>
-            `# ${date}\n\n${this.entries[date]}\n`
-        ).join('\n');
+        // Export current tab
+        const currentEntries = this.entries;
+        const markdown = this.entriesToMarkdown(currentEntries);
 
         const blob = new Blob([markdown], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `journal-export-${this.getDateString()}.md`;
+        const tabName = this.files[this.activeFileIndex].name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = `journal-${tabName}-${this.getDateString()}.md`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -794,13 +922,31 @@ class DailyJournal {
                     const fileInfo = this.foundFiles[index];
                     const content = await fileInfo.file.text();
                     const fileName = fileInfo.file.name;
-                    const fileKey = fileInfo.relativePath; // Use file path as unique key for directory files
+                    const fileKey = fileInfo.relativePath;
 
-                    // Store directory-loaded files separately with file path as key
-                    if (!this.directoryEntries) {
-                        this.directoryEntries = {};
-                    }
+                    // Parse entries
+                    const entries = this.parseContentToEntries(content);
+
+                    // Add to directoryEntries for persistence
                     this.directoryEntries[fileKey] = content;
+
+                    // Add or update file tab
+                    const existingFileIndex = this.files.findIndex(f => f.path === fileKey);
+                    
+                    const newFileObj = {
+                        name: fileName,
+                        type: 'file',
+                        path: fileKey,
+                        content: content,
+                        entries: entries
+                    };
+
+                    if (existingFileIndex >= 0) {
+                        this.files[existingFileIndex] = newFileObj;
+                    } else {
+                        this.files.push(newFileObj);
+                    }
+
                     loadedCount++;
                 } catch (error) {
                     console.warn(`Failed to load file ${this.foundFiles[index].file.name}:`, error);
@@ -814,19 +960,20 @@ class DailyJournal {
 
                 this.saveDirectoryEntries();
 
-                // Parse all directory entries and merge into main entries
-                this.parseAllDirectoryEntries();
-
-                this.generateYearTabs();
-                this.generateActivityCalendar();
-                this.displayPastEntries();
-                this.loadSelectedEntry();
-                this.showMessage(`Successfully loaded ${loadedCount} of ${selectedIndexes.length} selected files`, 'success');
+                // Refresh UI
+                this.renderFileTabs();
+                // Switch to the first newly loaded file (last one added?)
+                // Or stay on current? 
+                // Let's switch to the last added file if it was a new addition
+                this.switchFileTab(this.files.length - 1);
+                
+                this.showMessage(`Successfully loaded ${loadedCount} selected files`, 'success');
             } else {
                 this.showMessage('No valid content found in selected files', 'error');
             }
 
         } catch (error) {
+            console.error(error);
             this.showMessage('Failed to load selected files', 'error');
         }
     }
@@ -862,19 +1009,6 @@ class DailyJournal {
         if (document.getElementById('filterText').checked) extensions.push('txt');
         if (document.getElementById('filterJson').checked) extensions.push('json');
         return extensions;
-    }
-
-    extractDateFromContent(content, fileName) {
-        const dateRegex = /(\d{4}-\d{2}-\d{2})/;
-
-        let match = content.match(dateRegex);
-        if (match) return match[1];
-
-        match = fileName.match(dateRegex);
-        if (match) return match[1];
-
-        const today = this.getDateString();
-        return today;
     }
 
     clearDirectory() {
@@ -1020,13 +1154,31 @@ class DailyJournal {
             for (const fileInfo of existingFiles) {
                 try {
                     const content = await fileInfo.file.text();
-                    const fileKey = fileInfo.relativePath; // Use file path as unique key
+                    const fileKey = fileInfo.relativePath;
 
-                    // Store directory-loaded files separately with file path as key
-                    if (!this.directoryEntries) {
-                        this.directoryEntries = {};
-                    }
+                    // Parse entries
+                    const entries = this.parseContentToEntries(content);
+
+                    // Add to directoryEntries
                     this.directoryEntries[fileKey] = content;
+
+                    // Add or update file tab
+                    const existingFileIndex = this.files.findIndex(f => f.path === fileKey);
+                    
+                    const newFileObj = {
+                        name: fileInfo.file.name,
+                        type: 'file',
+                        path: fileKey,
+                        content: content,
+                        entries: entries
+                    };
+
+                    if (existingFileIndex >= 0) {
+                        this.files[existingFileIndex] = newFileObj;
+                    } else {
+                        this.files.push(newFileObj);
+                    }
+
                     loadedCount++;
                 } catch (error) {
                     console.warn(`Failed to load file ${fileInfo.file.name}:`, error);
@@ -1036,14 +1188,11 @@ class DailyJournal {
             if (loadedCount > 0) {
                 this.saveDirectoryEntries();
 
-                // Parse all directory entries and merge into main entries
-                this.parseAllDirectoryEntries();
-
-                this.generateYearTabs();
-                this.generateActivityCalendar();
-                this.displayPastEntries();
-                this.loadSelectedEntry();
-
+                // Refresh UI
+                this.renderFileTabs();
+                // Switch to last loaded? Or just stay.
+                // staying is probably safer unless user interaction triggered it.
+                
                 const missingCount = savedFilePaths.length - existingFiles.length;
                 let message = `Auto-loaded ${loadedCount} previously selected files`;
                 if (missingCount > 0) {
@@ -1053,6 +1202,7 @@ class DailyJournal {
             }
 
         } catch (error) {
+            console.error(error);
             this.showMessage('Failed to auto-load previously selected files', 'error');
         }
     }

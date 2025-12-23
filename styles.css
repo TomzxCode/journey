@@ -30,6 +30,67 @@ h1 {
     margin-bottom: 10px;
 }
 
+/* File Tabs Styles */
+.file-tabs-container {
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.file-tabs {
+    display: flex;
+    gap: 5px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 1px;
+}
+
+.file-tab {
+    padding: 10px 20px;
+    background-color: #f1f3f4;
+    border: 1px solid #e9ecef;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #495057;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-tab:hover {
+    background-color: #e2e6ea;
+}
+
+.file-tab.active {
+    background-color: white;
+    border-color: #007bff;
+    border-bottom-color: white; /* Hide bottom border to merge with content */
+    color: #007bff;
+    font-weight: bold;
+    margin-bottom: -2px; /* Push down to cover container border */
+    z-index: 1;
+}
+
+.file-tab .close-tab {
+    font-size: 1.2rem;
+    line-height: 1;
+    color: #adb5bd;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 5px;
+}
+
+.file-tab .close-tab:hover {
+    color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
 .date-picker {
     width: 100%;
     padding: 12px 15px;
@@ -590,5 +651,59 @@ button {
     .filter-btn {
         font-size: 0.8rem;
         padding: 6px 12px;
+    }
+
+    /* Mobile Sidebar for Tabs */
+    .file-tabs-container {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 250px;
+        background: #f8f9fa;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        padding: 20px;
+        display: block !important; /* Force display but hidden via transform */
+    }
+
+    .file-tabs-container.open {
+        transform: translateX(0);
+    }
+
+    .file-tabs {
+        flex-direction: column;
+        border-bottom: none;
+        gap: 10px;
+    }
+
+    .file-tab {
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+        margin-bottom: 0 !important;
+    }
+
+    .file-tab.active {
+        border-bottom-color: #007bff;
+    }
+
+    /* Toggle button for mobile sidebar */
+    .mobile-tab-toggle {
+        display: block;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1001;
+        background: #007bff;
+        color: white;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 50px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        cursor: pointer;
     }
 }
