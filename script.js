@@ -13,12 +13,23 @@ class DailyJournal {
     }
 
     init() {
+        this.registerServiceWorker();
         this.initializeDatePicker();
         this.bindEvents();
         this.initializeFiles();
         this.renderFileTabs();
         this.refreshView();
         this.loadDirectorySettings();
+    }
+
+    registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').then((registration) => {
+                console.log('ServiceWorker registered with scope:', registration.scope);
+            }).catch((error) => {
+                console.log('ServiceWorker registration failed:', error);
+            });
+        }
     }
 
     initializeFiles() {
