@@ -51,6 +51,14 @@ nav:
   - Developer Guide:
     - Architecture: architecture.md
     - Development: development.md
+  - Specifications:
+    - Journal Entry Management: spec/journal-entry-management.md
+    - Similar Entries: spec/similar-entries.md
+    - Activity Calendar: spec/activity-calendar.md
+    - Import/Export: spec/import-export.md
+    - Directory Loading: spec/directory-loading.md
+    - PWA & Offline Support: spec/pwa-offline-support.md
+    - Past Entries Filtering: spec/past-entries-filtering.md
 
 markdown_extensions:
   - pymdownx.highlight:
