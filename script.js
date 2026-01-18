@@ -187,8 +187,9 @@ class DailyJournal {
         this.generateYearTabs();
         this.generateActivityCalendar();
 
-        // Clear similar entries when switching views
-        document.getElementById('similarEntriesContainer').innerHTML = '';
+        // Re-calculate similar entries with current text and new entries
+        const currentText = document.getElementById('entryText').value;
+        this.findSimilarEntries(currentText);
     }
 
     initializeDatePicker() {
@@ -438,6 +439,9 @@ class DailyJournal {
         const searchText = currentText.toLowerCase().trim();
         const currentEntries = this.entries;
 
+        // Only use containsMatch if we have meaningful keywords (not just stop words)
+        const hasMeaningfulKeywords = words.length > 0;
+
         Object.keys(currentEntries).forEach(date => {
             if (date === selectedDateStr) return;
 
@@ -445,7 +449,7 @@ class DailyJournal {
             const entryWords = this.extractKeywords(entryText);
 
             // Check for exact substring matches (for names, specific phrases)
-            const containsMatch = entryText.toLowerCase().includes(searchText);
+            const containsMatch = hasMeaningfulKeywords && entryText.toLowerCase().includes(searchText);
 
             // Calculate keyword-based similarity
             const keywordSimilarity = this.calculateSimilarity(words, entryWords);
@@ -456,7 +460,7 @@ class DailyJournal {
                 finalScore = Math.max(0.8, keywordSimilarity); // Boost exact matches
             }
 
-            if (finalScore > 0.1 || containsMatch) {
+            if (finalScore > 0.1) {
                 similarEntries.push({
                     date,
                     content: entryText,
@@ -478,13 +482,21 @@ class DailyJournal {
             .filter(word => word.length > 1 && !stopWords.has(word));
     }
 
-    calculateSimilarity(words1, words2) {
-        const set1 = new Set(words1);
-        const set2 = new Set(words2);
-        const intersection = new Set([...set1].filter(x => set2.has(x)));
-        const union = new Set([...set1, ...set2]);
+    calculateSimilarity(searchWords, entryWords) {
+        const searchSet = new Set(searchWords);
+        const entrySet = new Set(entryWords);
 
-        return union.size > 0 ? intersection.size / union.size : 0;
+        // Count matching words
+        let matchCount = 0;
+        for (const word of searchSet) {
+            if (entrySet.has(word)) {
+                matchCount++;
+            }
+        }
+
+        // Score based on what proportion of search keywords appear in the entry
+        // This means if you type "LLMs and other stuff", entries with just "LLMs" still match well
+        return searchSet.size > 0 ? matchCount / searchSet.size : 0;
     }
 
     displaySimilarEntries(entries) {
@@ -1382,6 +1394,7 @@ class DailyJournal {
             if (loadedCount > 0) {
                 // Refresh UI
                 this.renderFileTabs();
+                this.refreshView();
                 this.updateLoadButtonState();
 
                 // Switch to last loaded? Or just stay.
