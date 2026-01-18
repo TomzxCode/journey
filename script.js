@@ -435,7 +435,7 @@ class DailyJournal {
             return;
         }
 
-        containerWrapper.style.display = 'block';
+        containerWrapper.style.display = 'flex';
         if (mobileToggle && window.innerWidth <= 600) {
             mobileToggle.style.display = 'block';
         }

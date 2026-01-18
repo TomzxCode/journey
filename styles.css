@@ -91,7 +91,6 @@ body {
 .container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 20px;
 }
 
 header {
@@ -109,25 +108,32 @@ h1 {
 
 /* File Tabs Styles */
 .file-tabs-container {
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
     margin-bottom: 20px;
-    overflow-x: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 20px;
+    flex-wrap: nowrap;
 }
 
 .file-tabs {
     display: flex;
-    gap: 5px;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 1px;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    flex-wrap: nowrap;
 }
 
 .file-tab {
-    padding: 10px 20px;
-    background-color: var(--bg-tertiary);
+    padding: 8px 16px;
+    background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     color: var(--text-secondary);
     white-space: nowrap;
     transition: all 0.2s ease;
@@ -138,34 +144,35 @@ h1 {
 
 .file-tab:hover {
     background-color: var(--bg-hover);
+    border-color: var(--accent-primary);
 }
 
 .file-tab.active {
-    background-color: var(--bg-secondary);
+    background-color: var(--accent-primary);
     border-color: var(--accent-primary);
-    border-bottom-color: var(--bg-secondary); /* Hide bottom border to merge with content */
-    color: var(--accent-primary);
-    font-weight: bold;
-    margin-bottom: -2px; /* Push down to cover container border */
-    z-index: 1;
+    color: white;
+    font-weight: 500;
 }
 
 .file-tab .close-tab {
-    font-size: 1.2rem;
+    font-size: 1rem;
     line-height: 1;
-    color: var(--text-muted);
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
+    color: inherit;
+    opacity: 0.7;
+    width: 16px;
+    height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 5px;
+    margin-left: 4px;
 }
 
 .file-tab .close-tab:hover {
-    color: var(--accent-danger);
-    background-color: rgba(220, 53, 69, 0.1);
+    opacity: 1;
+}
+
+.file-tab.active .close-tab:hover {
+    color: white;
 }
 
 .date-picker {
@@ -757,7 +764,7 @@ button {
         transition: transform 0.3s ease;
         box-shadow: 2px 0 10px var(--shadow);
         padding: 20px;
-        display: block !important; /* Force display but hidden via transform */
+        flex-direction: column;
     }
 
     .file-tabs-container.open {
@@ -766,18 +773,16 @@ button {
 
     .file-tabs {
         flex-direction: column;
-        border-bottom: none;
         gap: 10px;
     }
 
     .file-tab {
         border-radius: 6px;
-        border: 1px solid var(--border-color);
-        margin-bottom: 0 !important;
     }
 
-    .file-tab.active {
-        border-bottom-color: var(--accent-primary);
+    .theme-toggle {
+        margin-left: 0;
+        margin-top: 20px;
     }
 
     /* Toggle button for mobile sidebar */
@@ -817,37 +822,23 @@ button {
 
 /* Theme Toggle Button */
 .theme-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 50%;
-    width: 44px;
-    height: 44px;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 8px 16px;
+    margin-left: 10px;
+    opacity: 0.8;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.3rem;
-    box-shadow: 0 2px 8px var(--shadow);
-    transition: all 0.3s ease;
-    z-index: 100;
+    flex-shrink: 0;
 }
 
 .theme-toggle:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px var(--shadow-strong);
-}
-
-@media (max-width: 600px) {
-    .theme-toggle {
-        top: 10px;
-        right: 10px;
-        width: 40px;
-        height: 40px;
-        font-size: 1.1rem;
-    }
+    opacity: 1;
+    border-color: var(--accent-primary);
 }
 
 /* Modal Styles */
