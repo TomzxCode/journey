@@ -43,6 +43,9 @@ jobs:
         run: |
           rm -rf docs
           mv site docs
+      - name: Clean up unnecessary files prior to archiving
+        run: |
+          rm -rf .cache .github .venv spec test-files mkdocs.yml pyproject.toml uv.lock
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
