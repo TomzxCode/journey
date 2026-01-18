@@ -294,6 +294,15 @@ button {
     color: white;
 }
 
+.filter-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.filter-btn:disabled:hover {
+    background-color: var(--border-color);
+}
+
 .entry-item {
     background-color: var(--bg-active);
     padding: 15px;

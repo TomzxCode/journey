@@ -95,6 +95,12 @@ class DailyJournal {
             button.className = `filter-btn ${period.id === this.currentFilter ? 'active' : ''}`;
             button.dataset.filter = period.id;
             button.textContent = period.label;
+
+            // Disable button if no entry exists for this period
+            if (!this.hasEntryForPeriod(period)) {
+                button.disabled = true;
+            }
+
             button.addEventListener('click', () => this.filterPastEntries(period.id));
             container.appendChild(button);
         });
@@ -105,8 +111,8 @@ class DailyJournal {
         this.registerServiceWorker();
         this.initializeDatePicker();
         this.bindEvents();
-        this.renderFilterButtons();
         this.initializeFiles();
+        this.renderFilterButtons();
         this.renderFileTabs();
         this.refreshView();
         this.loadDirectorySettings();
@@ -628,15 +634,27 @@ class DailyJournal {
 
         if (filteredEntries.length === 0) {
             container.innerHTML = '<div class="no-entries">No entries found for this time period.</div>';
-            return;
+        } else {
+            container.innerHTML = filteredEntries.map(entry => `
+                <div class="entry-item">
+                    <div class="entry-date">${this.formatDate(entry.date)}</div>
+                    <div class="entry-content">${entry.content}</div>
+                </div>
+            `).join('');
         }
 
-        container.innerHTML = filteredEntries.map(entry => `
-            <div class="entry-item">
-                <div class="entry-date">${this.formatDate(entry.date)}</div>
-                <div class="entry-content">${entry.content}</div>
-            </div>
-        `).join('');
+        // Update button disabled states based on entry availability
+        this.updateFilterButtonStates();
+    }
+
+    updateFilterButtonStates() {
+        document.querySelectorAll('.filter-btn').forEach(button => {
+            const periodId = button.dataset.filter;
+            const period = this.pastPeriods.find(p => p.id === periodId);
+            if (period) {
+                button.disabled = !this.hasEntryForPeriod(period);
+            }
+        });
     }
 
     getFilteredEntries() {
@@ -677,6 +695,33 @@ class DailyJournal {
                 date,
                 content: currentEntries[date]
             }));
+    }
+
+    hasEntryForPeriod(period) {
+        const selectedDateStr = this.getDateString(this.selectedDate);
+        const currentEntries = this.entries;
+
+        // Calculate the target date based on the period configuration
+        const targetDate = new Date(this.selectedDate);
+
+        switch (period.unit) {
+            case 'days':
+                targetDate.setDate(targetDate.getDate() - period.value);
+                break;
+            case 'weeks':
+                targetDate.setDate(targetDate.getDate() - (period.value * 7));
+                break;
+            case 'months':
+                targetDate.setMonth(targetDate.getMonth() - period.value);
+                break;
+            case 'years':
+                targetDate.setFullYear(targetDate.getFullYear() - period.value);
+                break;
+        }
+
+        const targetDateStr = this.getDateString(targetDate);
+
+        return currentEntries.hasOwnProperty(targetDateStr);
     }
 
     formatDate(dateString) {
