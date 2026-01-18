@@ -22,20 +22,13 @@ class DailyJournal {
     // Default past periods configuration
     getDefaultPastPeriods() {
         return [
-            { id: 'yesterday', label: 'Yesterday', unit: 'days', value: 1 },
-            { id: '2days', label: '2 Days Ago', unit: 'days', value: 2 },
-            { id: '5days', label: '5 Days Ago', unit: 'days', value: 5 },
-            { id: 'lastWeek', label: 'Last Week', unit: 'weeks', value: 1 },
-            { id: '2weeks', label: '2 Weeks Ago', unit: 'weeks', value: 2 },
-            { id: '10weeks', label: '10 Weeks Ago', unit: 'weeks', value: 10 },
-            { id: 'lastMonth', label: 'Last Month', unit: 'months', value: 1 },
-            { id: '3months', label: '3 Months Ago', unit: 'months', value: 3 },
-            { id: '6months', label: '6 Months Ago', unit: 'months', value: 6 },
-            { id: '9months', label: '9 Months Ago', unit: 'months', value: 9 },
-            { id: '12months', label: '12 Months Ago', unit: 'months', value: 12 },
-            { id: 'lastYear', label: 'Last Year', unit: 'years', value: 1 },
-            { id: '3years', label: '3 Years Ago', unit: 'years', value: 3 },
-            { id: '5years', label: '5 Years Ago', unit: 'years', value: 5 },
+            { id: '1d', label: '1d', unit: 'days', value: 1 },
+            { id: '1w', label: '1w', unit: 'weeks', value: 1 },
+            { id: '2w', label: '2w', unit: 'weeks', value: 2 },
+            { id: '1mo', label: '1mo', unit: 'months', value: 1 },
+            { id: '3mo', label: '3mo', unit: 'months', value: 3 },
+            { id: '6mo', label: '6mo', unit: 'months', value: 6 },
+            { id: '1y', label: '1y', unit: 'years', value: 1 },
         ];
     }
 
