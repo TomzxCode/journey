@@ -13,6 +13,9 @@ class DailyJournal {
         // Configurable past entry periods
         this.pastPeriods = this.loadPastPeriods();
         this.editingPeriodId = null;
+
+        // Theme management
+        this.currentTheme = this.loadTheme();
         this.init();
     }
 
@@ -41,6 +44,44 @@ class DailyJournal {
         return stored ? JSON.parse(stored) : this.getDefaultPastPeriods();
     }
 
+    // Theme management methods
+    loadTheme() {
+        const stored = localStorage.getItem('journey.theme');
+        return stored || 'light';
+    }
+
+    saveTheme(theme) {
+        localStorage.setItem('journey.theme', theme);
+    }
+
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        this.currentTheme = theme;
+
+        // Update theme toggle button icon
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+        }
+    }
+
+    toggleTheme() {
+        const newTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        this.applyTheme(newTheme);
+        this.saveTheme(newTheme);
+    }
+
+    initializeTheme() {
+        this.applyTheme(this.currentTheme);
+
+        // Check for system preference if no saved theme
+        if (!localStorage.getItem('journey.theme')) {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const systemTheme = prefersDark ? 'dark' : 'light';
+            this.applyTheme(systemTheme);
+        }
+    }
+
     savePastPeriods() {
         localStorage.setItem('journey.pastPeriods', JSON.stringify(this.pastPeriods));
     }
@@ -60,6 +101,7 @@ class DailyJournal {
     }
 
     async init() {
+        this.initializeTheme();
         this.registerServiceWorker();
         this.initializeDatePicker();
         this.bindEvents();
@@ -246,6 +288,9 @@ class DailyJournal {
     }
 
     bindEvents() {
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+
         document.getElementById('datePicker').addEventListener('change', (e) => this.onDateChange(e));
         document.getElementById('saveEntry').addEventListener('click', () => this.saveEntry());
         document.getElementById('clearEntry').addEventListener('click', () => this.clearEntry());
