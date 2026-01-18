@@ -12,7 +12,7 @@ class DailyJournal {
         this.init();
     }
 
-    init() {
+    async init() {
         this.registerServiceWorker();
         this.initializeDatePicker();
         this.bindEvents();
@@ -20,6 +20,11 @@ class DailyJournal {
         this.renderFileTabs();
         this.refreshView();
         this.loadDirectorySettings();
+
+        // PWA: Auto-restore directory and files if running as PWA
+        if (this.isRunningAsPWA()) {
+            await this.restorePWAState();
+        }
     }
 
     registerServiceWorker() {
@@ -29,6 +34,118 @@ class DailyJournal {
             }).catch((error) => {
                 console.log('ServiceWorker registration failed:', error);
             });
+        }
+    }
+
+    isRunningAsPWA() {
+        // Check if running in standalone mode (PWA)
+        return window.matchMedia('(display-mode: standalone)').matches ||
+               window.navigator.standalone === true;
+    }
+
+    // IndexedDB helpers for persisting directory handles (PWA-only)
+    async getDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('journey-pwa-storage', 1);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('handles')) {
+                    db.createObjectStore('handles');
+                }
+            };
+        });
+    }
+
+    async saveDirectoryHandle(handle) {
+        if (!handle) return;
+        try {
+            const db = await this.getDB();
+            const tx = db.transaction('handles', 'readwrite');
+            tx.objectStore('handles').put(handle, 'directoryHandle');
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch (error) {
+            console.warn('Failed to save directory handle:', error);
+        }
+    }
+
+    async getDirectoryHandle() {
+        try {
+            const db = await this.getDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('handles', 'readonly');
+                const request = tx.objectStore('handles').get('directoryHandle');
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.warn('Failed to get directory handle:', error);
+            return null;
+        }
+    }
+
+    async clearDirectoryHandle() {
+        try {
+            const db = await this.getDB();
+            const tx = db.transaction('handles', 'readwrite');
+            tx.objectStore('handles').delete('directoryHandle');
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = () => reject(tx.error);
+            });
+        } catch (error) {
+            console.warn('Failed to clear directory handle:', error);
+        }
+    }
+
+    // PWA: Restore directory and auto-load files on startup
+    async restorePWAState() {
+        try {
+            const directoryHandle = await this.getDirectoryHandle();
+            if (!directoryHandle) {
+                console.log('No persisted directory handle found');
+                return;
+            }
+
+            // Request permission to access the directory
+            // For PWAs, the permission should already be granted from previous session
+            const permission = await directoryHandle.queryPermission({ mode: 'read' });
+            if (permission !== 'granted') {
+                // Try requesting permission
+                const requestPermission = await directoryHandle.requestPermission({ mode: 'read' });
+                if (requestPermission !== 'granted') {
+                    console.log('Directory permission not granted');
+                    return;
+                }
+            }
+
+            // Restore the directory
+            this.selectedDirectory = directoryHandle;
+
+            const directoryInfo = document.getElementById('directoryInfo');
+            const directoryPath = document.getElementById('selectedDirectoryPath');
+            const clearBtn = document.getElementById('clearDirectoryBtn');
+
+            directoryPath.textContent = directoryHandle.name;
+            directoryInfo.style.display = 'block';
+            clearBtn.disabled = false;
+
+            // Scan for files
+            await this.scanDirectoryFiles();
+
+            // Auto-load previously selected files
+            const savedFilePaths = this.getSavedSelectedFilePaths();
+            if (savedFilePaths && savedFilePaths.length > 0) {
+                await this.autoLoadPreviouslySelectedFiles(savedFilePaths);
+                this.showMessage(`Restored ${savedFilePaths.length} files from previous session`, 'success');
+            }
+
+        } catch (error) {
+            console.warn('Failed to restore PWA state:', error);
         }
     }
 
@@ -821,6 +938,11 @@ class DailyJournal {
             const directoryHandle = await window.showDirectoryPicker();
             this.selectedDirectory = directoryHandle;
 
+            // Persist directory handle for PWA
+            if (this.isRunningAsPWA()) {
+                await this.saveDirectoryHandle(directoryHandle);
+            }
+
             const directoryInfo = document.getElementById('directoryInfo');
             const directoryPath = document.getElementById('selectedDirectoryPath');
             const clearBtn = document.getElementById('clearDirectoryBtn');
@@ -1056,8 +1178,13 @@ class DailyJournal {
         return extensions;
     }
 
-    clearDirectory() {
+    async clearDirectory() {
         this.selectedDirectory = null;
+
+        // Clear persisted directory handle for PWA
+        if (this.isRunningAsPWA()) {
+            await this.clearDirectoryHandle();
+        }
 
         const directoryInfo = document.getElementById('directoryInfo');
         const fileListContainer = document.getElementById('fileListContainer');
