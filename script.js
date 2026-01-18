@@ -127,10 +127,98 @@ class DailyJournal {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js').then((registration) => {
                 console.log('ServiceWorker registered with scope:', registration.scope);
+
+                // Determine if we're in development mode
+                const isDevelopment = !this.isRunningAsPWA() || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+                // Send the mode to the service worker
+                if (registration.active) {
+                    registration.active.postMessage({
+                        type: 'SET_MODE',
+                        isDevelopment: isDevelopment
+                    });
+                } else if (registration.installing) {
+                    registration.installing.addEventListener('statechange', () => {
+                        if (registration.active) {
+                            registration.active.postMessage({
+                                type: 'SET_MODE',
+                                isDevelopment: isDevelopment
+                            });
+                        }
+                    });
+                }
+
+                // Listen for update notifications in production
+                if (!isDevelopment) {
+                    this.setupUpdateNotifications(registration);
+                }
+
+                // Handle updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New service worker is available, waiting to activate
+                            if (!isDevelopment) {
+                                this.showUpdateNotification();
+                            }
+                        }
+                    });
+                });
             }).catch((error) => {
                 console.log('ServiceWorker registration failed:', error);
             });
+
+            // Listen for messages from service worker
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+                    this.showUpdateNotification();
+                }
+            });
         }
+    }
+
+    setupUpdateNotifications(registration) {
+        // Listen for controller changes (service worker was updated)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            // Reload the page when the new service worker activates
+            window.location.reload();
+        });
+    }
+
+    showUpdateNotification() {
+        // Check if notification already exists
+        if (document.getElementById('updateNotification')) {
+            return;
+        }
+
+        const notification = document.createElement('div');
+        notification.id = 'updateNotification';
+        notification.className = 'update-notification';
+        notification.innerHTML = `
+            <div class="update-notification-content">
+                <span>A new version is available!</span>
+                <div class="update-notification-actions">
+                    <button id="updateNowBtn">Update Now</button>
+                    <button id="updateLaterBtn">Later</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(notification);
+
+        document.getElementById('updateNowBtn').addEventListener('click', () => {
+            // Tell the service worker to skip waiting
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'SKIP_WAITING'
+                });
+            }
+        });
+
+        document.getElementById('updateLaterBtn').addEventListener('click', () => {
+            notification.remove();
+        });
     }
 
     isRunningAsPWA() {

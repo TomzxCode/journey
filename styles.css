@@ -1070,3 +1070,85 @@ button {
         padding: 20px;
     }
 }
+
+/* Update Notification */
+.update-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.update-notification-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 20px var(--shadow-strong);
+    min-width: 280px;
+}
+
+.update-notification-content span {
+    display: block;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.update-notification-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.update-notification-actions button {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#updateNowBtn {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+#updateNowBtn:hover {
+    background-color: var(--accent-hover);
+}
+
+#updateLaterBtn {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+#updateLaterBtn:hover {
+    background-color: var(--bg-hover);
+}
+
+@media (max-width: 600px) {
+    .update-notification {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+    }
+
+    .update-notification-content {
+        min-width: unset;
+    }
+}
