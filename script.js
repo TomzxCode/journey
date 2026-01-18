@@ -9,13 +9,61 @@ class DailyJournal {
         this.selectedDate = new Date();
         this.selectedDirectory = null;
         this.foundFiles = [];
+
+        // Configurable past entry periods
+        this.pastPeriods = this.loadPastPeriods();
+        this.editingPeriodId = null;
         this.init();
+    }
+
+    // Default past periods configuration
+    getDefaultPastPeriods() {
+        return [
+            { id: 'yesterday', label: 'Yesterday', unit: 'days', value: 1 },
+            { id: '2days', label: '2 Days Ago', unit: 'days', value: 2 },
+            { id: '5days', label: '5 Days Ago', unit: 'days', value: 5 },
+            { id: 'lastWeek', label: 'Last Week', unit: 'weeks', value: 1 },
+            { id: '2weeks', label: '2 Weeks Ago', unit: 'weeks', value: 2 },
+            { id: '10weeks', label: '10 Weeks Ago', unit: 'weeks', value: 10 },
+            { id: 'lastMonth', label: 'Last Month', unit: 'months', value: 1 },
+            { id: '3months', label: '3 Months Ago', unit: 'months', value: 3 },
+            { id: '6months', label: '6 Months Ago', unit: 'months', value: 6 },
+            { id: '9months', label: '9 Months Ago', unit: 'months', value: 9 },
+            { id: '12months', label: '12 Months Ago', unit: 'months', value: 12 },
+            { id: 'lastYear', label: 'Last Year', unit: 'years', value: 1 },
+            { id: '3years', label: '3 Years Ago', unit: 'years', value: 3 },
+            { id: '5years', label: '5 Years Ago', unit: 'years', value: 5 },
+        ];
+    }
+
+    loadPastPeriods() {
+        const stored = localStorage.getItem('journey.pastPeriods');
+        return stored ? JSON.parse(stored) : this.getDefaultPastPeriods();
+    }
+
+    savePastPeriods() {
+        localStorage.setItem('journey.pastPeriods', JSON.stringify(this.pastPeriods));
+    }
+
+    renderFilterButtons() {
+        const container = document.querySelector('.time-filters');
+        container.innerHTML = '';
+
+        this.pastPeriods.forEach(period => {
+            const button = document.createElement('button');
+            button.className = `filter-btn ${period.id === this.currentFilter ? 'active' : ''}`;
+            button.dataset.filter = period.id;
+            button.textContent = period.label;
+            button.addEventListener('click', () => this.filterPastEntries(period.id));
+            container.appendChild(button);
+        });
     }
 
     async init() {
         this.registerServiceWorker();
         this.initializeDatePicker();
         this.bindEvents();
+        this.renderFilterButtons();
         this.initializeFiles();
         this.renderFileTabs();
         this.refreshView();
@@ -204,10 +252,6 @@ class DailyJournal {
         document.getElementById('entryText').addEventListener('input', (e) => this.onEntryInput(e));
         document.getElementById('entryText').addEventListener('blur', () => this.checkAndSaveEntry());
 
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.filterPastEntries(e.target.dataset.filter));
-        });
-
         document.getElementById('importBtn').addEventListener('click', () => this.importJournal());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportJournal());
         document.getElementById('importFile').addEventListener('change', (e) => this.handleFileImport(e));
@@ -218,6 +262,15 @@ class DailyJournal {
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
         document.getElementById('selectNoneFilesBtn').addEventListener('click', () => this.selectNoneFiles());
         document.getElementById('fileFilterInput').addEventListener('input', (e) => this.filterFileList(e.target.value));
+
+        // Configuration Modal Events
+        document.getElementById('configurePastEntriesBtn').addEventListener('click', () => this.openConfigModal());
+        document.getElementById('closeConfigModal').addEventListener('click', () => this.closeConfigModal());
+        document.getElementById('configModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('configModal')) this.closeConfigModal();
+        });
+        document.getElementById('addPeriodBtn').addEventListener('click', () => this.addPeriod());
+        document.getElementById('cancelEditBtn').addEventListener('click', () => this.cancelEdit());
 
         // Mobile tab toggle
         const mobileToggle = document.getElementById('mobileTabToggle');
@@ -545,42 +598,34 @@ class DailyJournal {
         const selectedDateStr = this.getDateString(this.selectedDate);
         const currentEntries = this.entries;
 
+        // Find the current period configuration
+        const period = this.pastPeriods.find(p => p.id === this.currentFilter);
+        if (!period) return [];
+
+        // Calculate the target date based on the period configuration
+        const targetDate = new Date(this.selectedDate);
+
+        switch (period.unit) {
+            case 'days':
+                targetDate.setDate(targetDate.getDate() - period.value);
+                break;
+            case 'weeks':
+                targetDate.setDate(targetDate.getDate() - (period.value * 7));
+                break;
+            case 'months':
+                targetDate.setMonth(targetDate.getMonth() - period.value);
+                break;
+            case 'years':
+                targetDate.setFullYear(targetDate.getFullYear() - period.value);
+                break;
+        }
+
+        const targetDateStr = this.getDateString(targetDate);
+
         return Object.keys(currentEntries)
             .filter(date => {
                 if (date === selectedDateStr) return false;
-
-                // Parse date string properly to avoid timezone issues
-                const [year, month, day] = date.split('-').map(Number);
-                const entryDate = new Date(year, month - 1, day);
-
-                switch (this.currentFilter) {
-                    case 'yesterday': {
-                        // Show only yesterday's entry
-                        const yesterday = new Date(this.selectedDate);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        return date === this.getDateString(yesterday);
-                    }
-                    case 'lastWeek': {
-                        // Show only the entry from 7 days ago
-                        const lastWeek = new Date(this.selectedDate);
-                        lastWeek.setDate(lastWeek.getDate() - 7);
-                        return date === this.getDateString(lastWeek);
-                    }
-                    case 'lastMonth': {
-                        // Show only the entry from the same day last month
-                        const lastMonth = new Date(this.selectedDate);
-                        lastMonth.setMonth(lastMonth.getMonth() - 1);
-                        return date === this.getDateString(lastMonth);
-                    }
-                    case 'lastYear': {
-                        // Show only the entry from the same day last year
-                        const lastYear = new Date(this.selectedDate);
-                        lastYear.setFullYear(lastYear.getFullYear() - 1);
-                        return date === this.getDateString(lastYear);
-                    }
-                    default:
-                        return false;
-                }
+                return date === targetDateStr;
             })
             .sort((a, b) => new Date(b) - new Date(a))
             .map(date => ({
@@ -1419,6 +1464,229 @@ class DailyJournal {
             const key = `journey.selectedFiles_${this.selectedDirectory.name}`;
             localStorage.removeItem(key);
         }
+    }
+
+    // Configuration Modal Methods
+    openConfigModal() {
+        const modal = document.getElementById('configModal');
+        modal.classList.add('open');
+        this.renderPeriodList();
+    }
+
+    closeConfigModal() {
+        const modal = document.getElementById('configModal');
+        modal.classList.remove('open');
+        this.cancelEdit();
+    }
+
+    renderPeriodList() {
+        const list = document.getElementById('periodList');
+        list.innerHTML = '';
+
+        this.pastPeriods.forEach((period, index) => {
+            const item = document.createElement('div');
+            item.className = 'period-item';
+            item.draggable = true;
+            item.dataset.index = index;
+
+            // Drag Handle
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'drag-handle';
+            dragHandle.innerHTML = '⋮⋮';
+            item.appendChild(dragHandle);
+
+            // Drag Events
+            item.addEventListener('dragstart', (e) => {
+                item.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', index);
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+                const draggingItems = list.querySelectorAll('.dragging');
+                draggingItems.forEach(i => i.classList.remove('dragging'));
+                this.updatePeriodsFromDOM();
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+
+                const draggingItem = list.querySelector('.dragging');
+                if (!draggingItem || draggingItem === item) return;
+
+                const box = item.getBoundingClientRect();
+                const offset = e.clientY - box.top - box.height / 2;
+
+                if (offset < 0) {
+                    list.insertBefore(draggingItem, item);
+                } else {
+                    list.insertBefore(draggingItem, item.nextSibling);
+                }
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                this.updatePeriodsFromDOM();
+            });
+
+            const info = document.createElement('div');
+            info.className = 'period-info';
+
+            const label = document.createElement('div');
+            label.className = 'period-label';
+            label.textContent = period.label;
+
+            const details = document.createElement('div');
+            details.className = 'period-details';
+            details.textContent = `${period.value} ${period.unit} ago`;
+
+            info.appendChild(label);
+            info.appendChild(details);
+            item.appendChild(info);
+
+            const actions = document.createElement('div');
+            actions.className = 'period-actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'period-edit';
+            editBtn.innerHTML = '✏️';
+            editBtn.title = 'Edit period';
+            editBtn.addEventListener('click', () => this.editPeriod(period.id));
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'period-remove';
+            removeBtn.innerHTML = '🗑️';
+            removeBtn.title = 'Remove period';
+            removeBtn.addEventListener('click', () => this.removePeriod(period.id));
+
+            actions.appendChild(editBtn);
+            actions.appendChild(removeBtn);
+            item.appendChild(actions);
+            list.appendChild(item);
+        });
+    }
+
+    updatePeriodsFromDOM() {
+        const list = document.getElementById('periodList');
+        const items = list.querySelectorAll('.period-item');
+        const newPeriods = [];
+
+        items.forEach(item => {
+            const index = parseInt(item.dataset.index);
+            newPeriods.push(this.pastPeriods[index]);
+        });
+
+        this.pastPeriods = newPeriods;
+        this.savePastPeriods();
+        this.renderFilterButtons();
+        // Re-render list to reset dataset indexes and event listeners
+        this.renderPeriodList();
+    }
+
+    addPeriod() {
+        const labelInput = document.getElementById('newPeriodLabel');
+        const valueInput = document.getElementById('newPeriodValue');
+        const unitInput = document.getElementById('newPeriodUnit');
+
+        const label = labelInput.value.trim();
+        const value = parseInt(valueInput.value);
+        const unit = unitInput.value;
+
+        if (!label) {
+            this.showMessage('Please enter a label', 'error');
+            return;
+        }
+
+        if (value < 1) {
+            this.showMessage('Value must be at least 1', 'error');
+            return;
+        }
+
+        if (this.editingPeriodId) {
+            const index = this.pastPeriods.findIndex(p => p.id === this.editingPeriodId);
+            if (index !== -1) {
+                this.pastPeriods[index].label = label;
+                this.pastPeriods[index].value = value;
+                this.pastPeriods[index].unit = unit;
+                this.showMessage('Period updated', 'success');
+            }
+            this.cancelEdit();
+        } else {
+            const newPeriod = {
+                id: `p_${Date.now()}`,
+                label,
+                value,
+                unit
+            };
+
+            this.pastPeriods.push(newPeriod);
+            this.showMessage('Period added', 'success');
+        }
+
+        this.savePastPeriods();
+        this.renderPeriodList();
+        this.renderFilterButtons();
+
+        // Reset inputs (already handled in cancelEdit for update case)
+        if (!this.editingPeriodId) {
+            labelInput.value = '';
+            valueInput.value = '1';
+            unitInput.value = 'days';
+        }
+    }
+
+    editPeriod(id) {
+        const period = this.pastPeriods.find(p => p.id === id);
+        if (!period) return;
+
+        this.editingPeriodId = id;
+
+        document.getElementById('newPeriodLabel').value = period.label;
+        document.getElementById('newPeriodValue').value = period.value;
+        document.getElementById('newPeriodUnit').value = period.unit;
+
+        document.getElementById('addPeriodBtn').textContent = 'Update Period';
+        document.getElementById('cancelEditBtn').style.display = 'block';
+
+        // Scroll to form
+        document.querySelector('.add-period-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    cancelEdit() {
+        this.editingPeriodId = null;
+
+        document.getElementById('newPeriodLabel').value = '';
+        document.getElementById('newPeriodValue').value = '1';
+        document.getElementById('newPeriodUnit').value = 'days';
+
+        document.getElementById('addPeriodBtn').textContent = 'Add Period';
+        document.getElementById('cancelEditBtn').style.display = 'none';
+    }
+
+    removePeriod(id) {
+        if (this.pastPeriods.length <= 1) {
+            this.showMessage('You must have at least one period', 'error');
+            return;
+        }
+
+        if (this.editingPeriodId === id) {
+            this.cancelEdit();
+        }
+
+        this.pastPeriods = this.pastPeriods.filter(p => p.id !== id);
+
+        // If we removed the active filter, switch to the first available one
+        if (this.currentFilter === id) {
+            this.currentFilter = this.pastPeriods[0].id;
+            this.filterPastEntries(this.currentFilter);
+        }
+
+        this.savePastPeriods();
+        this.renderPeriodList();
+        this.renderFilterButtons();
+        this.showMessage('Period removed', 'info');
     }
 }
 
