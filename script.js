@@ -288,12 +288,16 @@ class DailyJournal {
                 return;
             }
 
-            // Check permission for the persisted directory handle
-            // For PWAs, permission should persist across sessions via the handle
-            const permission = await directoryHandle.queryPermission({ mode: 'read' });
-            if (permission !== 'granted') {
-                // Persisted handle lost permission - clear it and let user re-select
-                console.log('Persisted directory handle lost permission, clearing stored handle');
+            // For installed PWAs (Chrome 122+), permissions persist automatically.
+            // Try to use the handle directly - if it fails, permission was revoked.
+            try {
+                // Test access by trying to get the first entry
+                for await (const entry of directoryHandle.values()) {
+                    break; // Just check if we can access the directory
+                }
+            } catch (accessError) {
+                // Handle is no longer accessible (permission revoked or directory moved)
+                console.log('Persisted directory handle no longer accessible, clearing:', accessError);
                 await this.clearDirectoryHandle();
                 return;
             }
