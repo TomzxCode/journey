@@ -279,7 +279,7 @@ class DailyJournal {
         }
     }
 
-    // PWA: Restore directory and auto-load files on startup
+    // PWA: Check for persisted directory on startup and show restore button if found
     async restorePWAState() {
         try {
             const directoryHandle = await this.getDirectoryHandle();
@@ -288,22 +288,51 @@ class DailyJournal {
                 return;
             }
 
-            // For installed PWAs (Chrome 122+), permissions persist automatically.
-            // Try to use the handle directly - if it fails, permission was revoked.
-            try {
-                // Test access by trying to get the first entry
-                for await (const entry of directoryHandle.values()) {
-                    break; // Just check if we can access the directory
-                }
-            } catch (accessError) {
-                // Handle is no longer accessible (permission revoked or directory moved)
-                console.log('Persisted directory handle no longer accessible, clearing:', accessError);
-                await this.clearDirectoryHandle();
+            // Show the "Restore Directory" button
+            const restoreBtn = document.getElementById('restoreDirectoryBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'inline-block';
+                // Store the handle for later use when button is clicked
+                this._pendingRestoreHandle = directoryHandle;
+            }
+
+        } catch (error) {
+            console.warn('Failed to check for persisted directory:', error);
+        }
+    }
+
+    // PWA: Restore directory with permission (called when user clicks "Restore Directory" button)
+    async restoreDirectoryWithPermission() {
+        try {
+            const directoryHandle = this._pendingRestoreHandle;
+            if (!directoryHandle) {
+                console.log('No pending directory handle to restore');
                 return;
+            }
+
+            // Hide the restore button
+            const restoreBtn = document.getElementById('restoreDirectoryBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = 'none';
+            }
+
+            // Check permission first
+            const permission = await directoryHandle.queryPermission({ mode: 'read' });
+            if (permission !== 'granted') {
+                // Request permission - this is now triggered by user gesture (button click)
+                const requestPermission = await directoryHandle.requestPermission({ mode: 'read' });
+                if (requestPermission !== 'granted') {
+                    console.log('Directory permission not granted');
+                    // Clear the handle if permission denied
+                    await this.clearDirectoryHandle();
+                    this._pendingRestoreHandle = null;
+                    return;
+                }
             }
 
             // Restore the directory
             this.selectedDirectory = directoryHandle;
+            this._pendingRestoreHandle = null;
 
             const directoryInfo = document.getElementById('directoryInfo');
             const directoryPath = document.getElementById('selectedDirectoryPath');
@@ -324,7 +353,8 @@ class DailyJournal {
             }
 
         } catch (error) {
-            console.warn('Failed to restore PWA state:', error);
+            console.warn('Failed to restore directory:', error);
+            this._pendingRestoreHandle = null;
         }
     }
 
@@ -391,6 +421,7 @@ class DailyJournal {
         document.getElementById('importFile').addEventListener('change', (e) => this.handleFileImport(e));
 
         document.getElementById('selectDirectoryBtn').addEventListener('click', () => this.selectDirectory());
+        document.getElementById('restoreDirectoryBtn').addEventListener('click', () => this.restoreDirectoryWithPermission());
         document.getElementById('updateFilesBtn').addEventListener('click', () => this.updateSelectedFiles());
         document.getElementById('clearDirectoryBtn').addEventListener('click', () => this.clearDirectory());
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
