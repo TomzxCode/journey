@@ -288,16 +288,14 @@ class DailyJournal {
                 return;
             }
 
-            // Request permission to access the directory
-            // For PWAs, the permission should already be granted from previous session
+            // Check permission for the persisted directory handle
+            // For PWAs, permission should persist across sessions via the handle
             const permission = await directoryHandle.queryPermission({ mode: 'read' });
             if (permission !== 'granted') {
-                // Try requesting permission
-                const requestPermission = await directoryHandle.requestPermission({ mode: 'read' });
-                if (requestPermission !== 'granted') {
-                    console.log('Directory permission not granted');
-                    return;
-                }
+                // Persisted handle lost permission - clear it and let user re-select
+                console.log('Persisted directory handle lost permission, clearing stored handle');
+                await this.clearDirectoryHandle();
+                return;
             }
 
             // Restore the directory
