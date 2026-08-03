@@ -634,7 +634,18 @@ class DailyJournal {
         const [year, month, day] = e.target.value.split('-').map(Number);
         this.selectedDate = new Date(year, month - 1, day);
         this.loadSelectedEntry();
+        this.selectFirstAvailablePeriod();
         this.displayPastEntries();
+    }
+
+    selectFirstAvailablePeriod() {
+        const firstWithEntry = this.pastPeriods.find(p => this.hasEntryForPeriod(p));
+        if (firstWithEntry) {
+            this.currentFilter = firstWithEntry.id;
+        }
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.querySelector(`[data-filter="${this.currentFilter}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
     }
 
     getDateString(date = new Date()) {
