@@ -61,10 +61,6 @@ class DailyJournal {
         if (themeToggle) {
             themeToggle.textContent = icon;
         }
-        const sidebarThemeToggle = document.getElementById('sidebarThemeToggle');
-        if (sidebarThemeToggle) {
-            sidebarThemeToggle.textContent = icon;
-        }
     }
 
     toggleTheme() {
@@ -412,9 +408,16 @@ class DailyJournal {
     bindEvents() {
         // Theme toggle
         document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
-        const sidebarThemeToggle = document.getElementById('sidebarThemeToggle');
-        if (sidebarThemeToggle) {
-            sidebarThemeToggle.addEventListener('click', () => this.toggleTheme());
+
+        // Import/Export panel toggle (hidden by default)
+        const importExportToggle = document.getElementById('importExportToggle');
+        if (importExportToggle) {
+            importExportToggle.addEventListener('click', () => {
+                const section = document.querySelector('.import-export');
+                const open = section.classList.toggle('open');
+                importExportToggle.classList.toggle('active', open);
+                importExportToggle.title = open ? 'Hide import / export' : 'Show import / export';
+            });
         }
 
         document.getElementById('datePicker').addEventListener('change', (e) => this.onDateChange(e));
@@ -448,7 +451,7 @@ class DailyJournal {
 
         // Close mobile menu when clicking outside
         document.addEventListener('click', (e) => {
-            const container = document.getElementById('fileTabsContainer');
+            const container = document.getElementById('sidebar');
             // Ignore the synthetic click that sometimes follows a swipe gesture
             if (Date.now() - (this._lastSwipeTime || 0) < 400) return;
             if (container.classList.contains('open') &&
@@ -462,7 +465,7 @@ class DailyJournal {
     }
 
     initSwipeNavigation() {
-        const container = document.getElementById('fileTabsContainer');
+        const container = document.getElementById('sidebar');
         const EDGE = 40;            // px from left edge where an open-swipe may begin
         const WIDTH = 250;          // drawer width (matches CSS)
         const SNAP_FRACTION = 0.15; // fraction of width required to commit a swipe
@@ -549,16 +552,15 @@ class DailyJournal {
 
     renderFileTabs() {
         const tabsContainer = document.getElementById('fileTabs');
-        const containerWrapper = document.getElementById('fileTabsContainer');
+
+        tabsContainer.innerHTML = '';
 
         if (this.files.length <= 1) {
-            containerWrapper.style.display = 'none';
+            tabsContainer.style.display = 'none';
             return;
         }
 
-        containerWrapper.style.display = 'block';
-
-        tabsContainer.innerHTML = '';
+        tabsContainer.style.display = '';
 
         this.files.forEach((file, index) => {
             const tab = document.createElement('div');
@@ -595,7 +597,7 @@ class DailyJournal {
         this.refreshView();
 
         // Close mobile menu if open
-        document.getElementById('fileTabsContainer').classList.remove('open');
+        document.getElementById('sidebar').classList.remove('open');
     }
 
     closeFileTab(index) {
@@ -952,7 +954,7 @@ class DailyJournal {
         container.innerHTML = entries.map(entry => `
             <div class="similar-entry" data-date="${entry.date}" role="button" tabindex="0">
                 <div class="entry-date">${this.formatDate(entry.date)}</div>
-                <div class="entry-content">${this.truncateText(entry.content, 150)}</div>
+                <div class="entry-content">${entry.content}</div>
             </div>
         `).join('');
 
