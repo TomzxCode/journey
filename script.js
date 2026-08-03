@@ -10,6 +10,10 @@ class DailyJournal {
         this.selectedDirectory = null;
         this.foundFiles = [];
 
+        // BM25+ indices, keyed by file.path
+        this.bm25Indices = new Map();
+        this.bm25PersistTimer = null;
+
         // Configurable past entry periods
         this.pastPeriods = this.loadPastPeriods();
         this.editingPeriodId = null;
@@ -111,6 +115,7 @@ class DailyJournal {
         this.bindEvents();
         this.initSwipeNavigation();
         this.initializeFiles();
+        await this.initializeBM25Indices();
         this.renderFilterButtons();
         this.renderFileTabs();
         this.refreshView();
@@ -603,6 +608,9 @@ class DailyJournal {
             delete this.directoryEntries[fileToRemove.path];
         }
 
+        // Drop the BM25 index for the closed file
+        this.removeBM25Index(fileToRemove.path);
+
         // Remove from files array
         this.files.splice(index, 1);
 
@@ -740,16 +748,23 @@ class DailyJournal {
         const currentEntries = this.entries; // Get current file's entries
 
         let saved = false;
+        let mutated = false;
         if (entryText) {
+            const previous = currentEntries[selectedDateStr];
             currentEntries[selectedDateStr] = entryText;
             await this.saveCurrentEntries();
             saved = true;
+            mutated = previous !== entryText;
         } else if (currentEntries[selectedDateStr]) {
             delete currentEntries[selectedDateStr];
             await this.saveCurrentEntries();
             saved = true;
+            mutated = true;
         }
 
+        if (mutated) {
+            this.updateBM25Document(selectedDateStr, entryText);
+        }
         this.refreshView();
         if (saved) this.setSaveIndicator('saved');
     }
@@ -801,70 +816,117 @@ class DailyJournal {
             return;
         }
 
-        const words = this.extractKeywords(currentText);
-        const similarEntries = [];
-        const selectedDateStr = this.getDateString(this.selectedDate);
-        const searchText = currentText.toLowerCase().trim();
-        const currentEntries = this.entries;
-
-        // Only use containsMatch if we have meaningful keywords (not just stop words)
-        const hasMeaningfulKeywords = words.length > 0;
-
-        Object.keys(currentEntries).forEach(date => {
-            if (date === selectedDateStr) return;
-
-            const entryText = currentEntries[date];
-            const entryWords = this.extractKeywords(entryText);
-
-            // Check for exact substring matches (for names, specific phrases)
-            const containsMatch = hasMeaningfulKeywords && entryText.toLowerCase().includes(searchText);
-
-            // Calculate keyword-based similarity
-            const keywordSimilarity = this.calculateSimilarity(words, entryWords);
-
-            // Combine both approaches: exact matches get higher priority
-            let finalScore = keywordSimilarity;
-            if (containsMatch) {
-                finalScore = Math.max(0.8, keywordSimilarity); // Boost exact matches
-            }
-
-            if (finalScore > 0.1) {
-                similarEntries.push({
-                    date,
-                    content: entryText,
-                    similarity: finalScore
-                });
-            }
-        });
-
-        similarEntries.sort((a, b) => b.similarity - a.similarity);
-        this.displaySimilarEntries(similarEntries.slice(0, 5));
-    }
-
-    extractKeywords(text) {
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'was', 'are', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'shall', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their']);
-
-        return text.toLowerCase()
-            .replace(/[^\w\s]/g, ' ')
-            .split(/\s+/)
-            .filter(word => word.length > 1 && !stopWords.has(word));
-    }
-
-    calculateSimilarity(searchWords, entryWords) {
-        const searchSet = new Set(searchWords);
-        const entrySet = new Set(entryWords);
-
-        // Count matching words
-        let matchCount = 0;
-        for (const word of searchSet) {
-            if (entrySet.has(word)) {
-                matchCount++;
-            }
+        const index = this.getActiveBM25Index();
+        if (!index || index.docCount === 0) {
+            document.getElementById('similarEntriesContainer').innerHTML = '';
+            return;
         }
 
-        // Score based on what proportion of search keywords appear in the entry
-        // This means if you type "LLMs and other stuff", entries with just "LLMs" still match well
-        return searchSet.size > 0 ? matchCount / searchSet.size : 0;
+        const selectedDateStr = this.getDateString(this.selectedDate);
+        const results = index.search(currentText, {
+            excludeId: selectedDateStr,
+            limit: 5,
+        });
+
+        if (results.length === 0) {
+            document.getElementById('similarEntriesContainer').innerHTML = '';
+            return;
+        }
+
+        const currentEntries = this.entries;
+        const similar = results
+            .map(r => {
+                const content = currentEntries[r.docId];
+                if (!content) return null;
+                return { date: r.docId, content, similarity: r.score };
+            })
+            .filter(Boolean);
+
+        this.displaySimilarEntries(similar);
+    }
+
+    // --- BM25+ index management ---
+
+    getActiveBM25Index() {
+        const file = this.files[this.activeFileIndex];
+        if (!file) return null;
+        return this.bm25Indices.get(file.path) || null;
+    }
+
+    async initializeBM25Indices() {
+        for (const file of this.files) {
+            await this.loadOrBuildBM25Index(file);
+        }
+    }
+
+    async loadOrBuildBM25Index(file) {
+        if (!file || this.bm25Indices.has(file.path)) return;
+        let index = null;
+        try {
+            const stored = await window.BM25.idbGet(file.path);
+            if (stored && stored.version === 1) {
+                index = window.BM25.Index.fromJSON(stored);
+                // Invalidate if the document set no longer matches.
+                if (index.docCount !== Object.keys(file.entries).length) {
+                    index = null;
+                }
+            }
+        } catch (error) {
+            console.warn(`Failed to load BM25 index for ${file.path}:`, error);
+        }
+        if (!index) {
+            index = new window.BM25.Index();
+            index.rebuild(file.entries);
+            this.scheduleBM25Persist(file.path);
+        }
+        this.bm25Indices.set(file.path, index);
+    }
+
+    // Synchronize a single document in the active file's index.
+    updateBM25Document(dateStr, text) {
+        const file = this.files[this.activeFileIndex];
+        if (!file) return;
+        const index = this.bm25Indices.get(file.path);
+        if (!index) return;
+        if (text) {
+            index.addDocument(dateStr, text);
+        } else {
+            index.removeDocument(dateStr);
+        }
+        this.scheduleBM25Persist(file.path);
+    }
+
+    // Rebuild the index for a file from scratch (used after bulk imports).
+    rebuildBM25ForFile(file) {
+        if (!file) return;
+        let index = this.bm25Indices.get(file.path);
+        if (!index) {
+            index = new window.BM25.Index();
+            this.bm25Indices.set(file.path, index);
+        }
+        index.rebuild(file.entries);
+        this.scheduleBM25Persist(file.path);
+    }
+
+    removeBM25Index(path) {
+        if (!this.bm25Indices.has(path)) return;
+        this.bm25Indices.delete(path);
+        window.BM25.idbDelete(path);
+    }
+
+    scheduleBM25Persist(path) {
+        if (this.bm25PersistTimer) clearTimeout(this.bm25PersistTimer);
+        this.bm25PersistTimer = setTimeout(() => this.persistBM25Index(path), 1000);
+    }
+
+    async persistBM25Index(path) {
+        const index = this.bm25Indices.get(path);
+        if (!index) return;
+        try {
+            await window.BM25.idbSet(path, index.toJSON());
+        } catch (error) {
+            console.warn(`Failed to persist BM25 index for ${path}:`, error);
+        }
     }
 
     displaySimilarEntries(entries) {
@@ -1197,6 +1259,7 @@ class DailyJournal {
                 Object.assign(currentEntries, entries);
 
                 await this.saveCurrentEntries();
+                this.rebuildBM25ForFile(this.files[this.activeFileIndex]);
                 this.refreshView();
                 this.showMessage('Journal imported successfully into current tab!', 'success');
             } catch (error) {
@@ -1486,6 +1549,9 @@ class DailyJournal {
                     // Remove from directoryEntries
                     delete this.directoryEntries[file.path];
 
+                    // Drop BM25 index for the removed file
+                    this.removeBM25Index(file.path);
+
                     // Remove from files array
                     this.files.splice(i, 1);
 
@@ -1529,6 +1595,9 @@ class DailyJournal {
                     } else {
                         this.files.push(newFileObj);
                     }
+
+                    // Rebuild the BM25 index for this file (covers both new and updated cases)
+                    this.rebuildBM25ForFile(newFileObj);
 
                     loadedCount++;
                 } catch (error) {
@@ -1783,6 +1852,9 @@ class DailyJournal {
                     } else {
                         this.files.push(newFileObj);
                     }
+
+                    // Rebuild the BM25 index for this file (covers both new and updated cases)
+                    this.rebuildBM25ForFile(newFileObj);
 
                     loadedCount++;
                 } catch (error) {
