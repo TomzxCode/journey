@@ -21,13 +21,18 @@
         <main>
             <div class="file-tabs-container" id="fileTabsContainer" style="display: none;">
                 <div class="file-tabs" id="fileTabs"></div>
+                <div class="sidebar-controls">
+                    <button class="sidebar-control-btn" id="sidebarThemeToggle" title="Toggle theme">🌙</button>
+                </div>
             </div>
 
             <section class="entry-section">
-                <input type="date" class="date-picker" id="datePicker">
-                <textarea id="entryText" placeholder="What's on your mind today?"></textarea>
+                <div class="entry-input-wrap">
+                    <textarea id="entryText" rows="1" placeholder="What's on your mind today?"></textarea>
+                    <span class="save-indicator" id="saveIndicator" title="Saved">✔️</span>
+                </div>
                 <div class="entry-actions">
-                    <button id="saveEntry">Save Entry</button>
+                    <input type="date" class="date-picker" id="datePicker">
                     <button id="clearEntry">Clear</button>
                 </div>
             </section>
@@ -115,8 +120,6 @@
             </section>
         </main>
     </div>
-
-    <div class="mobile-tab-toggle" id="mobileTabToggle" style="display: none;">📂</div>
 
     <!-- Configuration Modal -->
     <div class="modal-overlay" id="configModal">

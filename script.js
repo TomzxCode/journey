@@ -51,10 +51,15 @@ class DailyJournal {
         document.documentElement.setAttribute('data-theme', theme);
         this.currentTheme = theme;
 
-        // Update theme toggle button icon
+        // Update theme toggle button icon(s)
+        const icon = theme === 'dark' ? '☀️' : '🌙';
         const themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
-            themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+            themeToggle.textContent = icon;
+        }
+        const sidebarThemeToggle = document.getElementById('sidebarThemeToggle');
+        if (sidebarThemeToggle) {
+            sidebarThemeToggle.textContent = icon;
         }
     }
 
@@ -104,6 +109,7 @@ class DailyJournal {
         this.registerServiceWorker();
         this.initializeDatePicker();
         this.bindEvents();
+        this.initSwipeNavigation();
         this.initializeFiles();
         this.renderFilterButtons();
         this.renderFileTabs();
@@ -377,9 +383,12 @@ class DailyJournal {
     bindEvents() {
         // Theme toggle
         document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+        const sidebarThemeToggle = document.getElementById('sidebarThemeToggle');
+        if (sidebarThemeToggle) {
+            sidebarThemeToggle.addEventListener('click', () => this.toggleTheme());
+        }
 
         document.getElementById('datePicker').addEventListener('change', (e) => this.onDateChange(e));
-        document.getElementById('saveEntry').addEventListener('click', () => this.saveEntry());
         document.getElementById('clearEntry').addEventListener('click', () => this.clearEntry());
         document.getElementById('entryText').addEventListener('input', (e) => this.onEntryInput(e));
         document.getElementById('entryText').addEventListener('blur', () => this.checkAndSaveEntry());
@@ -404,41 +413,117 @@ class DailyJournal {
         document.getElementById('addPeriodBtn').addEventListener('click', () => this.addPeriod());
         document.getElementById('cancelEditBtn').addEventListener('click', () => this.cancelEdit());
 
-        // Mobile tab toggle
-        const mobileToggle = document.getElementById('mobileTabToggle');
-        if (mobileToggle) {
-            mobileToggle.addEventListener('click', () => {
-                document.getElementById('fileTabsContainer').classList.toggle('open');
-            });
-        }
-
         // Close mobile menu when clicking outside
         document.addEventListener('click', (e) => {
             const container = document.getElementById('fileTabsContainer');
-            const toggle = document.getElementById('mobileTabToggle');
+            // Ignore the synthetic click that sometimes follows a swipe gesture
+            if (Date.now() - (this._lastSwipeTime || 0) < 400) return;
             if (container.classList.contains('open') &&
-                !container.contains(e.target) &&
-                e.target !== toggle) {
+                !container.contains(e.target)) {
                 container.classList.remove('open');
             }
         });
+
+        // Keep the textarea height in sync when the viewport changes
+        window.addEventListener('resize', () => this.autoResizeEntry());
+    }
+
+    initSwipeNavigation() {
+        const container = document.getElementById('fileTabsContainer');
+        const EDGE = 40;            // px from left edge where an open-swipe may begin
+        const WIDTH = 250;          // drawer width (matches CSS)
+        const SNAP_FRACTION = 0.15; // fraction of width required to commit a swipe
+        const LOCK_AXIS = 10;       // movement before locking horizontal vs vertical
+        let dragging = false;
+        let locked = false;
+        let horizontal = false;
+        let startX = 0;
+        let startY = 0;
+        let deltaX = 0;
+        let openedViaDrag = false;
+
+        document.addEventListener('touchstart', (e) => {
+            if (window.innerWidth > 600) return;
+            if (dragging) return; // ignore additional fingers mid-drag
+            const touch = e.touches[0];
+            const open = container.classList.contains('open');
+            // Start a drag when the drawer is open (close from anywhere)
+            // or when the touch begins near the left edge (open from closed).
+            if (open || touch.clientX <= EDGE) {
+                dragging = true;
+                locked = false;
+                horizontal = false;
+                startX = touch.clientX;
+                startY = touch.clientY;
+                deltaX = 0;
+                openedViaDrag = !open;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!dragging) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - startX;
+            const dy = touch.clientY - startY;
+
+            if (!locked) {
+                // For edge-originated swipes, claim the gesture as soon as it
+                // leans horizontal, otherwise the browser's back-swipe wins.
+                const threshold = openedViaDrag ? 2 : LOCK_AXIS;
+                if (Math.abs(dx) <= threshold && Math.abs(dy) <= threshold) return;
+                locked = true;
+                horizontal = Math.abs(dx) > Math.abs(dy);
+                if (horizontal) container.style.transition = 'none';
+            }
+
+            // Let vertical gestures pass through (page scroll); take over
+            // horizontal ones and cancel the browser default (back navigation).
+            if (!horizontal) return;
+            e.preventDefault();
+
+            deltaX = dx;
+            let offset;
+            if (openedViaDrag) {
+                // Closed drawer slides in from -WIDTH toward 0.
+                offset = Math.min(0, Math.max(-WIDTH, dx - WIDTH));
+            } else {
+                // Open drawer slides out from 0 toward -WIDTH.
+                offset = Math.min(0, Math.max(-WIDTH, dx));
+            }
+            container.style.transform = `translateX(${offset}px)`;
+        }, { passive: false });
+
+        const finish = () => {
+            if (!dragging) return;
+            dragging = false;
+            const wasHorizontal = horizontal;
+            horizontal = false;
+            locked = false;
+            container.style.transition = '';
+            container.style.transform = '';
+            if (!wasHorizontal) return;
+
+            if (openedViaDrag && deltaX > WIDTH * SNAP_FRACTION) {
+                container.classList.add('open');
+            } else if (!openedViaDrag && deltaX < -WIDTH * SNAP_FRACTION) {
+                container.classList.remove('open');
+            }
+            this._lastSwipeTime = Date.now();
+        };
+        document.addEventListener('touchend', finish, { passive: true });
+        document.addEventListener('touchcancel', finish, { passive: true });
     }
 
     renderFileTabs() {
         const tabsContainer = document.getElementById('fileTabs');
         const containerWrapper = document.getElementById('fileTabsContainer');
-        const mobileToggle = document.getElementById('mobileTabToggle');
 
         if (this.files.length <= 1) {
             containerWrapper.style.display = 'none';
-            if (mobileToggle) mobileToggle.style.display = 'none';
             return;
         }
 
         containerWrapper.style.display = 'block';
-        if (mobileToggle && window.innerWidth <= 600) {
-            mobileToggle.style.display = 'block';
-        }
 
         tabsContainer.innerHTML = '';
 
@@ -563,6 +648,8 @@ class DailyJournal {
         const selectedDateStr = this.getDateString(this.selectedDate);
         const entry = this.entries[selectedDateStr] || '';
         document.getElementById('entryText').value = entry;
+        this.autoResizeEntry();
+        this.setSaveIndicator('saved');
     }
 
     checkAndSaveEntry() {
@@ -572,6 +659,8 @@ class DailyJournal {
 
         if (savedText !== currentText) {
             this.saveEntry();
+        } else {
+            this.setSaveIndicator('saved');
         }
     }
 
@@ -580,28 +669,45 @@ class DailyJournal {
         const entryText = document.getElementById('entryText').value.trim();
         const currentEntries = this.entries; // Get current file's entries
 
+        let saved = false;
         if (entryText) {
             currentEntries[selectedDateStr] = entryText;
             await this.saveCurrentEntries();
-            this.refreshView();
-            this.showMessage('Entry saved successfully!', 'success');
+            saved = true;
+        } else if (currentEntries[selectedDateStr]) {
+            delete currentEntries[selectedDateStr];
+            await this.saveCurrentEntries();
+            saved = true;
+        }
+
+        this.refreshView();
+        if (saved) this.setSaveIndicator('saved');
+    }
+
+    // state: 'saved' (✅) or 'dirty' (♻️ unsaved changes pending)
+    setSaveIndicator(state) {
+        const el = document.getElementById('saveIndicator');
+        if (!el) return;
+        if (state === 'dirty') {
+            el.textContent = '✏️';
+            el.title = 'Unsaved changes';
         } else {
-            if (currentEntries[selectedDateStr]) {
-                delete currentEntries[selectedDateStr];
-                await this.saveCurrentEntries();
-                this.refreshView();
-                this.showMessage('Entry cleared.', 'info');
-            }
+            el.textContent = '✔️';
+            el.title = 'Saved';
         }
     }
 
     clearEntry() {
         document.getElementById('entryText').value = '';
+        this.autoResizeEntry();
+        this.setSaveIndicator('dirty');
         document.getElementById('similarEntriesContainer').innerHTML = '';
     }
 
     onEntryInput(e) {
         const text = e.target.value;
+        this.autoResizeEntry();
+        this.setSaveIndicator('dirty');
 
         if (this.similarEntriesTimeout) {
             clearTimeout(this.similarEntriesTimeout);
@@ -610,6 +716,13 @@ class DailyJournal {
         this.similarEntriesTimeout = setTimeout(() => {
             this.findSimilarEntries(text);
         }, 150);
+    }
+
+    autoResizeEntry() {
+        const el = document.getElementById('entryText');
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
     }
 
     findSimilarEntries(currentText) {
@@ -1159,7 +1272,11 @@ class DailyJournal {
     async selectDirectory() {
         try {
             if (!('showDirectoryPicker' in window)) {
-                this.showMessage('Directory picker not supported in this browser. Use Chrome/Edge 86+', 'error');
+                if (!window.isSecureContext) {
+                    this.showMessage('Directory picker requires a secure context. Serve the app over HTTPS or open it via http://localhost.', 'error');
+                } else {
+                    this.showMessage('Directory picker not supported in this browser. Use Chrome/Edge 86+.', 'error');
+                }
                 return;
             }
 
