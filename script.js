@@ -116,10 +116,9 @@ class DailyJournal {
         this.refreshView();
         this.loadDirectorySettings();
 
-        // PWA: Auto-restore directory and files if running as PWA
-        if (this.isRunningAsPWA()) {
-            await this.restorePWAState();
-        }
+        // Restore the previously selected directory (auto if permission is still
+        // granted, otherwise via the one-click "Restore Directory" button)
+        await this.tryAutoRestoreDirectory();
     }
 
     registerServiceWorker() {
@@ -226,7 +225,7 @@ class DailyJournal {
                window.navigator.standalone === true;
     }
 
-    // IndexedDB helpers for persisting directory handles (PWA-only)
+    // IndexedDB helpers for persisting the directory handle across reloads
     async getDB() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open('journey-pwa-storage', 1);
@@ -285,50 +284,72 @@ class DailyJournal {
         }
     }
 
-    // PWA: Restore directory and auto-load files on startup
-    async restorePWAState() {
+    // On startup, try to silently restore the previously selected directory.
+    // If permission is still granted (Chrome remembers it per origin), restore
+    // automatically; otherwise surface a one-click "Restore Directory" button,
+    // since requestPermission() must run inside a user gesture.
+    async tryAutoRestoreDirectory() {
         try {
             const directoryHandle = await this.getDirectoryHandle();
-            if (!directoryHandle) {
-                console.log('No persisted directory handle found');
+            if (!directoryHandle) return;
+
+            const permission = await directoryHandle.queryPermission({ mode: 'readwrite' });
+            if (permission === 'granted') {
+                await this.applyRestoredDirectory(directoryHandle);
                 return;
             }
 
-            // Request permission to access the directory
-            // For PWAs, the permission should already be granted from previous session
-            const permission = await directoryHandle.queryPermission({ mode: 'read' });
-            if (permission !== 'granted') {
-                // Try requesting permission
-                const requestPermission = await directoryHandle.requestPermission({ mode: 'read' });
-                if (requestPermission !== 'granted') {
-                    console.log('Directory permission not granted');
-                    return;
-                }
-            }
-
-            // Restore the directory
-            this.selectedDirectory = directoryHandle;
-
-            const directoryInfo = document.getElementById('directoryInfo');
-            const directoryPath = document.getElementById('selectedDirectoryPath');
-            const clearBtn = document.getElementById('clearDirectoryBtn');
-
-            directoryPath.textContent = directoryHandle.name;
-            directoryInfo.style.display = 'block';
-            clearBtn.disabled = false;
-
-            // Scan for files
-            await this.scanDirectoryFiles();
-
-            // Auto-load previously selected files
-            const savedFilePaths = this.getSavedSelectedFilePaths();
-            if (savedFilePaths && savedFilePaths.length > 0) {
-                await this.autoLoadPreviouslySelectedFiles(savedFilePaths);
-                this.showMessage(`Restored ${savedFilePaths.length} files from previous session`, 'success');
-            }
-
+            // Permission needs a user gesture — show the restore button.
+            this._pendingRestoreHandle = directoryHandle;
+            const restoreBtn = document.getElementById('restoreDirectoryBtn');
+            if (restoreBtn) restoreBtn.style.display = 'inline-block';
         } catch (error) {
-            console.warn('Failed to restore PWA state:', error);
+            console.warn('Failed to auto-restore directory:', error);
+        }
+    }
+
+    // Triggered by the "Restore Directory" button (user gesture).
+    async restoreDirectoryWithPermission() {
+        const directoryHandle = this._pendingRestoreHandle;
+        if (!directoryHandle) return;
+
+        try {
+            const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') {
+                this.showMessage('Directory permission not granted', 'info');
+                return;
+            }
+            await this.applyRestoredDirectory(directoryHandle);
+        } catch (error) {
+            console.warn('Failed to restore directory:', error);
+        } finally {
+            this._pendingRestoreHandle = null;
+            const restoreBtn = document.getElementById('restoreDirectoryBtn');
+            if (restoreBtn) restoreBtn.style.display = 'none';
+        }
+    }
+
+    // Apply a restored directory: set state, update UI, scan, and re-attach file
+    // handles so edits write to the OS files again.
+    async applyRestoredDirectory(directoryHandle) {
+        this.selectedDirectory = directoryHandle;
+
+        const directoryInfo = document.getElementById('directoryInfo');
+        const directoryPath = document.getElementById('selectedDirectoryPath');
+        const clearBtn = document.getElementById('clearDirectoryBtn');
+
+        directoryPath.textContent = directoryHandle.name;
+        directoryInfo.style.display = 'block';
+        clearBtn.disabled = false;
+
+        // Scan for files
+        await this.scanDirectoryFiles();
+
+        // Auto-load previously selected files (this re-attaches FileSystemFileHandles)
+        const savedFilePaths = this.getSavedSelectedFilePaths();
+        if (savedFilePaths && savedFilePaths.length > 0) {
+            await this.autoLoadPreviouslySelectedFiles(savedFilePaths);
+            this.showMessage(`Restored ${savedFilePaths.length} files from previous session`, 'success');
         }
     }
 
@@ -401,6 +422,10 @@ class DailyJournal {
         document.getElementById('importFile').addEventListener('change', (e) => this.handleFileImport(e));
 
         document.getElementById('selectDirectoryBtn').addEventListener('click', () => this.selectDirectory());
+        const restoreBtn = document.getElementById('restoreDirectoryBtn');
+        if (restoreBtn) {
+            restoreBtn.addEventListener('click', () => this.restoreDirectoryWithPermission());
+        }
         document.getElementById('updateFilesBtn').addEventListener('click', () => this.updateSelectedFiles());
         document.getElementById('clearDirectoryBtn').addEventListener('click', () => this.clearDirectory());
         document.getElementById('selectAllFilesBtn').addEventListener('click', () => this.selectAllFiles());
@@ -1325,13 +1350,11 @@ class DailyJournal {
                 return;
             }
 
-            const directoryHandle = await window.showDirectoryPicker();
+            const directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             this.selectedDirectory = directoryHandle;
 
-            // Persist directory handle for PWA
-            if (this.isRunningAsPWA()) {
-                await this.saveDirectoryHandle(directoryHandle);
-            }
+            // Persist directory handle so we can restore (and keep OS write access) on reload
+            await this.saveDirectoryHandle(directoryHandle);
 
             const directoryInfo = document.getElementById('directoryInfo');
             const directoryPath = document.getElementById('selectedDirectoryPath');
@@ -1571,11 +1594,13 @@ class DailyJournal {
 
     async clearDirectory() {
         this.selectedDirectory = null;
+        this._pendingRestoreHandle = null;
 
-        // Clear persisted directory handle for PWA
-        if (this.isRunningAsPWA()) {
-            await this.clearDirectoryHandle();
-        }
+        // Clear persisted directory handle
+        await this.clearDirectoryHandle();
+
+        const restoreBtn = document.getElementById('restoreDirectoryBtn');
+        if (restoreBtn) restoreBtn.style.display = 'none';
 
         const directoryInfo = document.getElementById('directoryInfo');
         const fileListContainer = document.getElementById('fileListContainer');
