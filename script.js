@@ -634,6 +634,7 @@ class DailyJournal {
         const [year, month, day] = e.target.value.split('-').map(Number);
         this.selectedDate = new Date(year, month - 1, day);
         this.loadSelectedEntry();
+        this.findSimilarEntries(document.getElementById('entryText').value);
         this.selectFirstAvailablePeriod();
         this.displayPastEntries();
     }
