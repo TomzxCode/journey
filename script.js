@@ -1241,6 +1241,8 @@ class DailyJournal {
     }
 
     showTooltip(event, dateString) {
+        if (window.matchMedia('(hover: none)').matches) return;
+
         const tooltip = document.createElement('div');
         tooltip.className = 'tooltip';
 
