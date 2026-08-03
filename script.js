@@ -1,6 +1,6 @@
 class DailyJournal {
     constructor() {
-        this.directoryEntries = {};
+        this.directoryEntries = this.loadCachedDirectoryEntries();
         this.files = [];
         this.activeFileIndex = 0;
         this.currentFilter = 'yesterday';
@@ -358,6 +358,9 @@ class DailyJournal {
                 entries: entries
             });
         });
+
+        // Resume the previously active file tab if it still exists
+        this.restoreActiveFile();
     }
 
     get entries() {
@@ -557,6 +560,7 @@ class DailyJournal {
         if (index === this.activeFileIndex) return;
 
         this.activeFileIndex = index;
+        this.saveActiveFilePath();
         this.renderFileTabs();
         this.refreshView();
 
@@ -587,6 +591,8 @@ class DailyJournal {
         this.renderFileTabs();
         this.refreshView();
         this.updateLoadButtonState();
+        this.persistDirectoryEntries();
+        this.saveActiveFilePath();
         this.showMessage(`Closed ${fileToRemove.name}`, 'info');
     }
 
@@ -610,6 +616,44 @@ class DailyJournal {
         return stored ? JSON.parse(stored) : {};
     }
 
+    loadCachedDirectoryEntries() {
+        try {
+            const stored = localStorage.getItem('journey.directoryEntries');
+            return stored ? JSON.parse(stored) : {};
+        } catch {
+            return {};
+        }
+    }
+
+    persistDirectoryEntries() {
+        try {
+            localStorage.setItem('journey.directoryEntries', JSON.stringify(this.directoryEntries));
+        } catch (error) {
+            console.warn('Failed to persist directory entries:', error);
+        }
+    }
+
+    // Persist/restore the active file tab (by path, which is stable across reloads)
+    loadActiveFilePath() {
+        return localStorage.getItem('journey.activeFilePath');
+    }
+
+    saveActiveFilePath() {
+        const file = this.files[this.activeFileIndex];
+        if (file) {
+            localStorage.setItem('journey.activeFilePath', file.path);
+        }
+    }
+
+    restoreActiveFile() {
+        const savedPath = this.loadActiveFilePath();
+        if (!savedPath) return;
+        const index = this.files.findIndex(f => f.path === savedPath);
+        if (index >= 0) {
+            this.activeFileIndex = index;
+        }
+    }
+
     async saveCurrentEntries() {
         const currentFile = this.files[this.activeFileIndex];
 
@@ -623,6 +667,7 @@ class DailyJournal {
 
             // Update directoryEntries
             this.directoryEntries[currentFile.path] = newContent;
+            this.persistDirectoryEntries();
 
             // Write to disk if handle is available
             if (currentFile.handle) {
@@ -1476,6 +1521,7 @@ class DailyJournal {
             // Save the selected file paths for future auto-loading
             const selectedFilePaths = selectedIndexes.map(index => this.foundFiles[index].relativePath);
             this.saveSelectedFilePaths(selectedFilePaths);
+            this.persistDirectoryEntries();
 
             // Refresh UI
             this.renderFileTabs();
@@ -1725,6 +1771,7 @@ class DailyJournal {
             }
 
             if (loadedCount > 0) {
+                this.persistDirectoryEntries();
                 // Refresh UI
                 this.renderFileTabs();
                 this.refreshView();
