@@ -992,13 +992,8 @@ class DailyJournal {
         // Parse date string properly to avoid timezone issues
         const [year, month, day] = dateString.split('-').map(Number);
         const date = new Date(year, month - 1, day);
-        const options = {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        };
-        return date.toLocaleDateString('en-US', options);
+        const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+        return `${weekday}, ${dateString}`;
     }
 
     truncateText(text, maxLength) {
