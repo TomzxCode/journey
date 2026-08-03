@@ -45,7 +45,7 @@ This specification defines the requirements for the similar entries feature, whi
 
 ### Interaction
 
-- The system MAY allow clicking on similar entries to navigate to that date
+- The system MUST allow clicking on similar entries (or activating via keyboard) to load that entry's date as the current date
 - The system MUST NOT interrupt the user's typing flow
 - The system MUST update results dynamically as content changes
 

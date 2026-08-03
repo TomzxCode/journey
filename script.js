@@ -938,11 +938,26 @@ class DailyJournal {
         }
 
         container.innerHTML = entries.map(entry => `
-            <div class="similar-entry">
+            <div class="similar-entry" data-date="${entry.date}" role="button" tabindex="0">
                 <div class="entry-date">${this.formatDate(entry.date)}</div>
                 <div class="entry-content">${this.truncateText(entry.content, 150)}</div>
             </div>
         `).join('');
+
+        container.querySelectorAll('.similar-entry').forEach(el => {
+            const loadDate = () => {
+                const datePicker = document.getElementById('datePicker');
+                datePicker.value = el.dataset.date;
+                datePicker.dispatchEvent(new Event('change'));
+            };
+            el.addEventListener('click', loadDate);
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    loadDate();
+                }
+            });
+        });
     }
 
     filterPastEntries(filter) {
