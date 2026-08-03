@@ -191,6 +191,19 @@ body {
     }
 }
 
+@media (max-width: 1023px) {
+    .app-layout > .main-content,
+    .app-layout > .sidebar-right {
+        display: contents;
+    }
+
+    .entry-section { order: 1; }
+    .past-entries { order: 2; }
+    .similar-entries { order: 3; }
+    .activity-calendar { order: 4; }
+    .app-layout > .import-export { order: 5; }
+}
+
 header {
     text-align: center;
     margin-bottom: 30px;
