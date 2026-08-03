@@ -31,9 +31,8 @@
     --calendar-border: rgba(27, 31, 35, 0.06);
     --calendar-border-hover: rgba(27, 31, 35, 0.3);
 
-    /* Similar entry highlight */
-    --similar-entry-bg: #fff3cd;
-    --similar-entry-border: #ffc107;
+    /* Entry card background (sidebar past/similar entries) */
+    --entry-bg: #f1f3f4;
 }
 
 [data-theme="dark"] {
@@ -69,9 +68,8 @@
     --calendar-border: rgba(255, 255, 255, 0.1);
     --calendar-border-hover: rgba(255, 255, 255, 0.3);
 
-    /* Similar entry highlight */
-    --similar-entry-bg: #4a4010;
-    --similar-entry-border: #d4a017;
+    /* Entry card background: slightly darker than the body so cards read as inset panels */
+    --entry-bg: #141414;
 }
 
 * {
@@ -425,7 +423,7 @@ button {
 }
 
 .entry-item {
-    background-color: var(--bg-active);
+    background-color: var(--entry-bg);
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 6px;
@@ -445,18 +443,13 @@ button {
 }
 
 .similar-entry {
-    background-color: var(--similar-entry-bg);
-    border-left-color: var(--similar-entry-border);
-    margin-bottom: 10px;
-    padding: 10px;
-    font-size: 0.9rem;
     cursor: pointer;
     transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
 .similar-entry:hover,
 .similar-entry:focus-visible {
-    background-color: var(--similar-entry-border);
+    background-color: var(--bg-hover);
     transform: translateX(2px);
     outline: none;
 }

@@ -952,7 +952,7 @@ class DailyJournal {
         }
 
         container.innerHTML = entries.map(entry => `
-            <div class="similar-entry" data-date="${entry.date}" role="button" tabindex="0">
+            <div class="entry-item similar-entry" data-date="${entry.date}" role="button" tabindex="0">
                 <div class="entry-date">${this.formatDate(entry.date)}</div>
                 <div class="entry-content">${entry.content}</div>
             </div>
