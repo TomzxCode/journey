@@ -113,6 +113,7 @@ class DailyJournal {
         this.initializeFiles();
         await this.initializeBM25Indices();
         this.renderFilterButtons();
+        this.selectFirstAvailablePeriod();
         this.renderFileTabs();
         this.refreshView();
         this.loadDirectorySettings();
@@ -643,8 +644,11 @@ class DailyJournal {
 
     selectFirstAvailablePeriod() {
         const firstWithEntry = this.pastPeriods.find(p => this.hasEntryForPeriod(p));
-        if (firstWithEntry) {
-            this.currentFilter = firstWithEntry.id;
+        // Fall back to the first period so currentFilter is always valid,
+        // even when no period has an entry yet.
+        const target = firstWithEntry || this.pastPeriods[0];
+        if (target) {
+            this.currentFilter = target.id;
         }
         document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
         const activeBtn = document.querySelector(`[data-filter="${this.currentFilter}"]`);
