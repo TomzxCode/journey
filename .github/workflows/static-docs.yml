@@ -47,7 +47,7 @@ jobs:
         run: |
           rm -rf .cache .github .venv spec test-files mkdocs.yml pyproject.toml uv.lock
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           # Upload entire repository
           path: '.'
