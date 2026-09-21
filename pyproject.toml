@@ -8,6 +8,6 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-    "mkdocs>=1.5.0",
+    "mkdocs>=1.6.1",
     "mkdocs-material[imaging]>=9.7.7",
 ]
